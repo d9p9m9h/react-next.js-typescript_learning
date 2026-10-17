@@ -11,12 +11,10 @@ export default function RootLayout(
   { children,}: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ background: '#111111' }}>
+      <body style={{ background: '#000000' }}>
         {/* Navigation Bar သို့မဟုတ် Header ကို ဒီနေရာမှာ ထည့်နိုင်ပါတယ် */}
 
-        <main>
-          {children}
-        </main>
+        {children}
 
         {/* Footer ကို ဒီနေရာမှာ ထည့်နိုင်ပါတယ် */}
       </body>
