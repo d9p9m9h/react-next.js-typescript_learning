@@ -57,18 +57,18 @@ function UserStatus() {
     )
   }
 
-  if (users.status === 'logged in') {
-    return (
-      <form onSubmit={userSubmit}>
-        <input type="text" value={users.username} onChange={userInputChange} />
-        <input type="email" value={users.email} onChange={userInputChange} />
-        <button type="submit">Login</button>
-      </form>
-    )
-  }
+  // if (users.status === 'logged in') {
+  //   return (
+  //     <form onSubmit={userSubmit}>
+  //       <input type="text" value={users.username} onChange={userInputChange} />
+  //       <input type="email" value={users.email} onChange={userInputChange} />
+  //       <button type="submit">Login</button>
+  //     </form>
+  //   )
+  // }
 
-  return (
+  // return (
         
-    )
+  //   )
 
 }

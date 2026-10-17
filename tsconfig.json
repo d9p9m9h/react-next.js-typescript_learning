@@ -29,9 +29,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    "**/*.{test,spec}.?(c|m)[jt]s?(x)"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "**/node_modules/**, **/.git/**"
   ]
 }

@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "next dev"
+    "dev": "next dev",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "next": "^16.4.0",
