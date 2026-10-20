@@ -18,6 +18,11 @@
     "isolatedModules": true,
     "noUnusedParameters": true,
     "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
     "plugins": [
       {
         "name": "next"

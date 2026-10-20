@@ -1,17 +1,157 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Design tokens — Emerald + Gold, light & dark
+   ============================================================ */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    "Noto Sans Myanmar", sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Noto Sans Myanmar",
+    "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-code), ui-monospace, "SFMono-Regular", Menlo,
+    monospace;
+
+  --color-emerald-50: oklch(0.982 0.018 155.826);
+  --color-emerald-100: oklch(0.925 0.076 156.742);
+  --color-emerald-200: oklch(0.868 0.135 157.431);
+  --color-emerald-300: oklch(0.79 0.17 158.168);
+  --color-emerald-400: oklch(0.696 0.185 158.253);
+  --color-emerald-500: oklch(0.627 0.194 158.256);
+  --color-emerald-600: oklch(0.578 0.188 158.138);
+  --color-emerald-700: oklch(0.508 0.166 157.934);
+  --color-emerald-800: oklch(0.43 0.142 157.61);
+  --color-emerald-900: oklch(0.379 0.121 156.534);
+  --color-emerald-950: oklch(0.262 0.086 157.735);
+
+  --color-gold-50: oklch(0.987 0.024 92.6);
+  --color-gold-100: oklch(0.962 0.06 95.617);
+  --color-gold-200: oklch(0.924 0.11 95.746);
+  --color-gold-300: oklch(0.879 0.162 96.383);
+  --color-gold-400: oklch(0.828 0.189 94.665);
+  --color-gold-500: oklch(0.769 0.188 89.258);
+  --color-gold-600: oklch(0.666 0.179 86.724);
+  --color-gold-700: oklch(0.555 0.153 83.318);
+  --color-gold-800: oklch(0.456 0.126 80.382);
+  --color-gold-900: oklch(0.394 0.1 77.399);
+  --color-gold-950: oklch(0.274 0.077 75.83);
 }
 
-html,
-body {
-  font-family: var(--font-sans);
+/* ============================================================
+   Semantic surface tokens (driven by .dark on <html>)
+   ============================================================ */
+:root {
+  --surface-base: oklch(0.985 0.004 160);
+  --surface-raised: oklch(1 0 0);
+  --surface-sunken: oklch(0.965 0.008 160);
+  --surface-border: oklch(0.9 0.012 160);
+  --surface-border-strong: oklch(0.85 0.015 160);
+  --text-strong: oklch(0.24 0.03 160);
+  --text-muted: oklch(0.52 0.02 160);
+  --text-subtle: oklch(0.65 0.015 160);
+  --accent: var(--color-emerald-600);
+  --accent-contrast: oklch(1 0 0);
+  --highlight: var(--color-gold-500);
 }
 
-body {
-  /* Burmese စာလုံးများ ကောင်းစွာ မြင်ရအောင် */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.dark {
+  --surface-base: oklch(0.19 0.018 165);
+  --surface-raised: oklch(0.235 0.02 165);
+  --surface-sunken: oklch(0.155 0.016 165);
+  --surface-border: oklch(0.31 0.022 165);
+  --surface-border-strong: oklch(0.38 0.026 165);
+  --text-strong: oklch(0.96 0.008 160);
+  --text-muted: oklch(0.74 0.018 160);
+  --text-subtle: oklch(0.6 0.018 160);
+  --accent: var(--color-emerald-400);
+  --accent-contrast: oklch(0.16 0.02 165);
+  --highlight: var(--color-gold-400);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--surface-base);
+    color: var(--text-strong);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    border-color: var(--surface-border);
+  }
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+@utility surface-raised {
+  background-color: var(--surface-raised);
+}
+
+@utility surface-sunken {
+  background-color: var(--surface-sunken);
+}
+
+@utility surface-border {
+  border-color: var(--surface-border);
+}
+
+@utility text-strong {
+  color: var(--text-strong);
+}
+
+@utility text-muted {
+  color: var(--text-muted);
+}
+
+@utility text-subtle {
+  color: var(--text-subtle);
+}
+
+@utility accent-text {
+  color: var(--accent);
+}
+
+@utility accent-bg {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+@utility highlight-text {
+  color: var(--highlight);
+}
+
+@utility highlight-bg {
+  background-color: var(--highlight);
+  color: oklch(0.16 0.02 165);
+}
+
+/* Thin scrollbars that follow the theme */
+@layer utilities {
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-border-strong) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: var(--surface-border-strong);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
