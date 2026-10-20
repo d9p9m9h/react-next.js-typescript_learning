@@ -1010,22 +1010,6 @@ npm install -D @tailwindcss/postcss postcss
 **Remote:** https://github.com/d9p9m9h/react-next.js-typescript_learning
 **Branch:** `master` (tracking `origin/master`)
 
-### Files that should not be committed
-
-`tsconfig.tsbuildinfo` is a TypeScript build artifact. It is listed in `.gitignore`, but it was already tracked before the ignore rule was added, so git keeps tracking it. Remove it from the index:
-
-```bash
-git rm --cached tsconfig.tsbuildinfo
-```
-
-### Pushing this session's work
-
-```bash
-git add .
-git commit -m "Phase 3 — UI Redesign: Learning Lab shell, code pane, live preview"
-git push
-```
-
 > Commit messages in this repository follow the pattern `Phase N — Lesson X: <description>`.
 
 ---
