@@ -20,4 +20,4 @@ function SearchBox() {
     </form>
   )
 }
-export default SearchBox()
+export default SearchBox

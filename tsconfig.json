@@ -16,6 +16,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "noUnusedParameters": true,
     "jsx": "react-jsx",
     "plugins": [
       {

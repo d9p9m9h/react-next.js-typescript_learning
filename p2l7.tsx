@@ -30,7 +30,7 @@ export default CourseCard
 
 // Phase 2 — Lesson 7: Extend Section: Union Type
 
-type Theme = 'light' | 'dark'
+type Theme = 'light' | 'dark' | 'system'
 type ThemeProps = {
   theme: Theme
 }
@@ -42,6 +42,9 @@ function CurrentTheme({ theme }: ThemeProps) {
   }
   if (theme === 'dark') {
     return <h2>Dark Theme</h2>
+  }
+  if (theme === 'system') {
+    return <h2>Follow System Theme</h2>
   }
   return <h1>Something went wrong</h1>
 }
