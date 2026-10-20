@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { lessons } from "@/lib/lessons";
+import { lessonIndex } from "@/lib/lesson-index";
 
 export default function HomePage() {
-  redirect(`/lesson/${lessons[0].slug}`);
+  redirect(`/lesson/${lessonIndex[0].slug}`);
 }

@@ -5,18 +5,19 @@ import { usePathname } from "next/navigation";
 
 import { useProgress } from "@/components/progress-store";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { lessons } from "@/lib/lessons";
+import { lessonCount, lessonIndex } from "@/lib/lesson-index";
 
 export function LabHeader() {
   const pathname = usePathname();
-  const { completed, streak } = useProgress();
+  const { visited, completed, streak } = useProgress();
 
   const activeSlug = pathname?.startsWith("/lesson/")
     ? pathname.split("/lesson/")[1]
     : null;
-  const activeLesson = lessons.find((l) => l.slug === activeSlug);
+  const activeLesson = lessonIndex.find((l) => l.slug === activeSlug);
 
-  const percent = Math.round((completed.length / lessons.length) * 100);
+  // Only confirmed completions count toward the progress bar.
+  const percent = Math.round((completed.length / lessonCount) * 100);
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--surface-border)] bg-[var(--surface-raised)]/85 backdrop-blur-xl">
@@ -41,14 +42,14 @@ export function LabHeader() {
         </Link>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {/* Progress */}
+          {/* Progress — counts confirmed completions only */}
           <div className="hidden items-center gap-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)] px-3 py-1.5 md:flex">
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-subtle)]">
                 Progress
               </span>
               <span className="text-xs font-semibold tabular-nums text-[var(--text-strong)]">
-                {completed.length}/{lessons.length} lessons
+                {completed.length}/{lessonCount} completed
               </span>
             </div>
             <div
@@ -64,6 +65,23 @@ export function LabHeader() {
                 style={{ width: `${percent}%` }}
               />
             </div>
+          </div>
+
+          {/* Visited count — shown separately so opening is not completion */}
+          <div
+            title={`${visited.length} of ${lessonCount} lessons visited`}
+            className="hidden items-center gap-2 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)] px-3 py-2 sm:flex"
+          >
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-full border-2 border-[var(--text-subtle)]"
+            />
+            <span className="text-xs font-bold tabular-nums text-[var(--text-muted)]">
+              {visited.length}
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              visited
+            </span>
           </div>
 
           {/* Streak */}

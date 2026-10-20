@@ -4,16 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useProgress } from "@/components/progress-store";
-import { lessons } from "@/lib/lessons";
+import { lessonIndex } from "@/lib/lesson-index";
 
 export function LabSidebar() {
   const pathname = usePathname();
-  const { completed } = useProgress();
+  const { visited, completed } = useProgress();
 
   const activeSlug = pathname?.startsWith("/lesson/")
     ? pathname.split("/lesson/")[1]
     : pathname === "/"
-      ? lessons[0]?.slug
+      ? lessonIndex[0]?.slug
       : null;
 
   return (
@@ -27,14 +27,15 @@ export function LabSidebar() {
             Learning path
           </p>
           <span className="rounded-md bg-[var(--surface-sunken)] px-2 py-1 text-[10px] font-bold tabular-nums text-[var(--text-muted)]">
-            {completed.length}/{lessons.length}
+            {completed.length}/{lessonIndex.length}
           </span>
         </div>
 
         <ol className="mt-4 space-y-1.5">
-          {lessons.map((lesson) => {
+          {lessonIndex.map((lesson) => {
             const isActive = lesson.slug === activeSlug;
             const isDone = completed.includes(lesson.slug);
+            const isVisited = visited.includes(lesson.slug);
 
             return (
               <li key={lesson.slug}>
@@ -76,6 +77,17 @@ export function LabSidebar() {
                     <span className="mt-0.5 block text-xs leading-5 text-[var(--text-subtle)]">
                       {lesson.detail}
                     </span>
+
+                    {/* Visited but not completed — shown as a hollow dot. */}
+                    {!isDone && isVisited ? (
+                      <span className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                        <span
+                          aria-hidden="true"
+                          className="size-1.5 rounded-full border border-current"
+                        />
+                        Visited
+                      </span>
+                    ) : null}
                   </span>
                 </Link>
               </li>
