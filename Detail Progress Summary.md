@@ -1,6 +1,7 @@
 # Detail Progress Summary
 
 **Project:** `react-next` — React Learning Lab
+**Repository:** https://github.com/d9p9m9h/react-next.js-typescript_learning
 **Path:** `C:\__d9p__\react-next`
 **Stack:** Next.js 16.4.2 (App Router, Turbopack) · React 19.3 · TypeScript 7.0.2 · Tailwind CSS v4
 **Date:** 2026-10-21
@@ -1001,6 +1002,31 @@ npm install -D @tailwindcss/postcss postcss
 | **Semantic token** | A CSS variable like `--surface-raised` that changes value with the theme |
 | **FOUC**           | Flash of Unstyled Content — wrong theme shown before CSS/paint           |
 | **SSG**            | Static Site Generation — HTML prerendered at build time                  |
+
+---
+
+## Appendix D — Repository
+
+**Remote:** https://github.com/d9p9m9h/react-next.js-typescript_learning
+**Branch:** `master` (tracking `origin/master`)
+
+### Files that should not be committed
+
+`tsconfig.tsbuildinfo` is a TypeScript build artifact. It is listed in `.gitignore`, but it was already tracked before the ignore rule was added, so git keeps tracking it. Remove it from the index:
+
+```bash
+git rm --cached tsconfig.tsbuildinfo
+```
+
+### Pushing this session's work
+
+```bash
+git add .
+git commit -m "Phase 3 — UI Redesign: Learning Lab shell, code pane, live preview"
+git push
+```
+
+> Commit messages in this repository follow the pattern `Phase N — Lesson X: <description>`.
 
 ---
 
