@@ -37,6 +37,12 @@ the bottom, so `console.log(...)` output stays in view while you edit.
 When a compile or runtime error happens, a compact error strip appears above the editor with a
 **Details** button that jumps straight to the preview, where the full message is shown.
 
+> **Layout note.** The height chain uses flex sizing (`flex-1` + `min-h-0`) rather than percentage
+> heights. A percentage height (`h-full`) cannot resolve against a flex-item parent, so it silently
+> collapses the editor to the height of its own content. See §10.1 of
+> [Detail Progress Summary.md](Detail%20Progress%20Summary.md) before changing any `h-full` in
+> these components.
+
 ## How it works
 
 1. **Discovery** — `lib/playground/files.ts` uses Turbopack's `import.meta.glob("/practice/*.tsx", { query: "?raw" })`

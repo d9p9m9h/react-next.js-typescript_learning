@@ -40,7 +40,7 @@ export class PlaygroundErrorBoundary extends Component<Props, State> {
     return (
       <div
         role="alert"
-        className="flex flex-col gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4"
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto rounded-xl border border-rose-500/40 bg-rose-500/10 p-4"
       >
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="text-base">

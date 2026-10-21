@@ -226,7 +226,19 @@ export function PlaygroundPreview({
           : `/playground/sandbox?token=${encodeURIComponent(token)}`
       }
       title="Playground preview"
-      className="h-full w-full border-0"
+      /*
+       * The frame fills the box it is given.
+       *
+       * `h-full` (i.e. `height: 100%`) cannot be used here: the
+       * parent is a **flex item**, so its height comes from the flex
+       * layout rather than from a definite box, and a percentage
+       * height against an indefinite height falls back to `auto` —
+       * which would collapse the frame to a couple of lines.
+       *
+       * As a flex item of a flex column, the frame simply grows to
+       * fill the remaining space.
+       */
+      className="min-h-0 w-full flex-1 border-0"
       // `allow-scripts` lets the learner's code run. `allow-same-origin`
       // is deliberately **not** granted: with it, the frame would share
       // this page's origin and could reach the app's DOM and storage.

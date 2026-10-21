@@ -76,7 +76,21 @@ export function PlaygroundEditor({
   }[status];
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)]">
+    /*
+     * The panel must fill the space the playground gives it.
+     *
+     * It cannot use `h-full` (i.e. `height: 100%`) for that: the
+     * parent is a **flex item** whose height comes from the flex
+     * layout, and a percentage height cannot resolve against an
+     * indefinite height — it silently falls back to `auto`, which
+     * collapses the editor to the height of its own content.
+     *
+     * So the panel is a flex *item* (`flex-1`) of a flex *column*
+     * parent, and the textarea is a flex item of the panel. No
+     * percentage heights are involved, so every box gets the height
+     * it is actually given.
+     */
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)]">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--surface-border)] px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <span
@@ -128,7 +142,14 @@ export function PlaygroundEditor({
         </div>
       </div>
 
-      <div className="scrollbar-slim min-h-0 flex-1 overflow-auto focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[var(--accent)]">
+      {/*
+        The scroll container.
+
+        The `<textarea>` is the thing that scrolls, so it is the flex
+        item that grows — the container only provides the focus ring
+        and the padding-free frame around it.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[var(--accent)]">
         <label className="sr-only" htmlFor="playground-source">
           {fileName} ရဲ့ source code
         </label>
@@ -140,7 +161,7 @@ export function PlaygroundEditor({
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="min-h-full w-full resize-none bg-transparent p-4 font-mono text-[13px] leading-relaxed text-[var(--text-strong)] outline-none"
+          className="scrollbar-slim min-h-0 w-full flex-1 resize-none overflow-auto bg-transparent p-4 font-mono text-[13px] leading-relaxed text-[var(--text-strong)] outline-none"
         />
       </div>
     </div>

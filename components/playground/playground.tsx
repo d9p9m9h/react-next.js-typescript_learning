@@ -347,7 +347,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
             </div>
           ) : null}
 
-          <div className="min-h-0 min-w-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <PlaygroundEditor
               value={source}
               onChange={handleChange}
@@ -404,9 +404,9 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
               </span>
             </div>
 
-            <div className="relative min-h-0 flex-1">
+            <div className="relative flex min-h-0 flex-1 flex-col">
               {hasNoComponent ? (
-                <div className="h-full overflow-auto p-5 sm:p-6">
+                <div className="min-h-0 flex-1 overflow-auto p-5 sm:p-6">
                   <p className="text-sm leading-7 text-[var(--text-muted)]">
                     ဒီဖိုင်ထဲမှာ component မရှိသေးပါ — code အားလုံး comment အဖြစ်
                     ရှိနေပါတယ်။ Code ဘက်မှာ code ကို ဖြည့်ပြီး စမ်းကြည့်ပါ။

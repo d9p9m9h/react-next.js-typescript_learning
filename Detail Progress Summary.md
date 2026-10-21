@@ -11,8 +11,8 @@
 
 ## Changelog
 
-| Date       | Change                                                                                          |
-| ---------- | ----------------------------------------------------------------------------------------------- |
+| Date       | Change                                                                                                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-10-21 | **STEP 5** — practice files moved from the project root into `practice/`; the editor and the preview now take turns via a **Code / Preview** switch (one panel at a time). |
 
 ---
@@ -72,9 +72,9 @@ preview.
 
 | Concern        | How it is handled now                                               |
 | -------------- | ------------------------------------------------------------------- |
-| File selection | A `tablist` of every `.tsx` file in `practice/`, keyboard-navigable   |
+| File selection | A `tablist` of every `.tsx` file in `practice/`, keyboard-navigable |
 | Editing        | A plain `<textarea>`; changes are debounced 400 ms, then compiled   |
-| View switch    | A **Code / Preview** toggle — only one panel is on screen at a time  |
+| View switch    | A **Code / Preview** toggle — only one panel is on screen at a time |
 | Preview        | A sandboxed iframe running the compiled module                      |
 | Console        | `console.*` calls are forwarded from the iframe and shown here      |
 | Errors         | Compile errors and runtime errors are shown inline over the preview |
@@ -188,8 +188,8 @@ sub-directories.
 > **Why the rule still works after the move.** Turbopack matches a rule glob against the **file
 > name** unless the glob contains a `/`. `"*.tsx"` has no `/`, so it matches `practice/P2L3.tsx`
 > just as it matched the old root-level `P2L3.tsx`. (Verified in the bundled Next.js docs:
-> *"Globs used in the `rules` object match based on file name, unless the glob contains a `/`
-> character, which will cause it to match based on the full project-relative file path."*)
+> _"Globs used in the `rules` object match based on file name, unless the glob contains a `/`
+> character, which will cause it to match based on the full project-relative file path."_)
 
 > **Turbopack-only feature.** `import.meta.glob` does not work under webpack. This project builds
 > with Turbopack (`next dev` / `next build` in Next 16).
@@ -343,8 +343,8 @@ frame-ancestors 'self'
 | `components/theme-toggle.tsx`                         | Light / Dark / System buttons with `aria-pressed`.                                                     |
 | `components/theme-provider.tsx`                       | Theme state, `localStorage` key `react-lab-theme`, follows the OS when set to `system`.                |
 | `components/storage-cleanup.tsx`                      | Deletes the orphaned `react-lab-progress` key once on mount.                                           |
-| `components/playground/playground.tsx`                | The workspace: file tabs, view switch, editor, preview, console; owns the compile debounce. |
-| `components/playground/playground-view-toggle.tsx`     | The **Code / Preview** switch — one panel at a time.                                 |
+| `components/playground/playground.tsx`                | The workspace: file tabs, view switch, editor, preview, console; owns the compile debounce.            |
+| `components/playground/playground-view-toggle.tsx`    | The **Code / Preview** switch — one panel at a time.                                                   |
 | `components/playground/playground-editor.tsx`         | `<textarea>` editor with Tab-insert, status label and Reset button.                                    |
 | `components/playground/playground-preview.tsx`        | The `<iframe>` and the `postMessage` bridge; validates the source and token.                           |
 | `components/playground/playground-console.tsx`        | Renders captured log lines.                                                                            |
@@ -390,9 +390,9 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | `components/theme-toggle.tsx`                         | 54    | Theme switch            |
 | `components/storage-cleanup.tsx`                      | 17    | Obsolete-key cleanup    |
 | `components/playground/playground.tsx`                | 417   | The workspace           |
-| `components/playground/playground-view-toggle.tsx`     | 58    | Code / Preview switch  |
-| `components/playground/playground-editor.tsx`         | 133   | Editor + Reset          |
-| `components/playground/playground-preview.tsx`        | 209   | Iframe + message bridge |
+| `components/playground/playground-view-toggle.tsx`    | 58    | Code / Preview switch   |
+| `components/playground/playground-editor.tsx`         | 153   | Editor + Reset          |
+| `components/playground/playground-preview.tsx`        | 221   | Iframe + message bridge |
 | `components/playground/playground-console.tsx`        | 75    | Console panel           |
 | `components/playground/playground-error-boundary.tsx` | 61    | Error boundary          |
 
@@ -401,7 +401,7 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | File                                | Lines | Purpose                                        |
 | ----------------------------------- | ----- | ---------------------------------------------- |
 | `lib/storage.ts`                    | 25    | Deletes the obsolete progress key              |
-| `lib/playground/files.ts`           | 49    | Discovers the `practice/*.tsx` files            |
+| `lib/playground/files.ts`           | 49    | Discovers the `practice/*.tsx` files           |
 | `lib/playground/registry.tsx`       | 80    | File → component + props mapping               |
 | `lib/playground/protocol.ts`        | 164   | Message types, token, message validation       |
 | `lib/playground/props.ts`           | 127   | React props → serialisable form                |
@@ -473,10 +473,10 @@ Burmese text renders correctly.
 
 **Layout** (measured in a real browser, 2026-10-21, after the single-panel change):
 
-| Viewport   | Result                                                                                                     |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
+| Viewport   | Result                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------- |
 | 1440 × 900 | **One** panel fills the width (579 px) + console (160 px). `scrollHeight === 900` — the page does **not** scroll. |
-| 390 × 844  | The visible panel is 492 px + console 160 px. No horizontal overflow.                                      |
+| 390 × 844  | The visible panel is 492 px + console 160 px. No horizontal overflow.                                             |
 
 The other panel is hidden with `display: none` — it is **not** unmounted, so the editor keeps its
 cursor position and the sandbox keeps its rendered result when the learner switches back and forth.
@@ -484,7 +484,41 @@ cursor position and the sandbox keeps its rendered result when the learner switc
 The breakpoint is `lg`. Below it the visible panel carries `min-h-[380px]` so it stays usable; on
 large screens `lg:min-h-0` lets it fill the viewport.
 
-### 10.1 The Code / Preview switch
+### 10.1 The height chain — why `h-full` collapses the editor
+
+This is the single most important layout fact in the project, and it is a **CSS trap** that is easy
+to reintroduce.
+
+A **percentage height** (`height: 100%`, which is what Tailwind's `h-full` compiles to) can only be
+resolved against a parent with a **definite** height. When the parent is a **flex item**, its
+height comes from the flex algorithm, not from a definite box — so the percentage cannot be
+resolved and silently falls back to `auto`, i.e. **the height of the element's own content**.
+
+That is exactly what happened:
+
+| Box                                   | Before (broken) | After (fixed) |
+| ------------------------------------- | --------------- | ------------- |
+| Editor panel (`h-full`)               | 124 px         | 359 px       |
+| Scroll container                      | 81 px          | 315 px       |
+| `<textarea>` (≈ lines visible)        | 74 px (≈ 2)    | 315 px (≈ 13)|
+| Preview `<iframe>` (`h-full`)         | 150 px         | 319 px (fills)|
+
+**The rule:** in the height path, use **flex sizing** (`flex-1`, `min-h-0`) and avoid percentage
+heights entirely.
+
+- `components/playground/playground-editor.tsx` — the panel is `flex-1` of a flex column (was
+  `h-full`); the scroll container is a flex column; the `<textarea>` is `flex-1` and is the element
+  that scrolls (`overflow-auto`), so the scrollbar belongs to the textarea.
+- `components/playground/playground-preview.tsx` — the `<iframe>` is `flex-1` (was `h-full`).
+- `components/playground/playground.tsx` — the two wrappers around the panels are flex columns;
+  the preview's `relative` holder is a flex column.
+- `components/playground/playground-error-boundary.tsx` — the fallback error card is `flex-1` so it
+  fills the preview box when it replaces the frame.
+
+The `min-h-0` on every level is what allows a flex item to shrink below its content height —
+without it, the textarea's content would push the panel open and the page would scroll again.
+
+### 10.2 The Code / Preview switch
 
 `components/playground/playground-view-toggle.tsx` is a two-button group (`⌨ Code` / `▷ Preview`)
 with `aria-pressed` on the active one. It sits next to the file tablist and is the only thing that
@@ -524,7 +558,7 @@ Route (app)
 | #   | Check                                                    | Result                                                                                                                        |
 | --- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `/` opens the playground directly (no redirect, no hero) | ✅ editor + preview + console present; title "React Code Playground"                                                          |
-| 2   | All 8 `practice/*.tsx` files appear in the selector     | ✅ 8 tabs                                                                                                                     |
+| 2   | All 8 `practice/*.tsx` files appear in the selector      | ✅ 8 tabs                                                                                                                     |
 | 3   | Editing the source updates the preview                   | ✅ `<h2 id="s4">STEP4-OK</h2>`                                                                                                |
 | 4   | Compile error is displayed clearly                       | ✅ `role="alert"`, "Compile မအောင်မြင်ပါ", status badge → `error`; the app keeps running                                      |
 | 5   | Runtime error is displayed clearly                       | ✅ `role="alert"`, "Runtime error ဖြစ်ပါတယ်" + the thrown message; the app keeps running                                      |
@@ -532,13 +566,16 @@ Route (app)
 | 7   | Console output                                           | ✅ `log — step4 verified`; the **Clear** button empties the panel                                                             |
 | 8   | Theme switching                                          | ✅ Light / Dark / System all apply to the app **and** the preview iframe; `aria-pressed` updates; persisted to `localStorage` |
 | 9   | Desktop layout                                           | ✅ one panel, no page scroll, no horizontal overflow                                                                          |
-| 10  | Mobile layout                                            | ✅ one panel, no horizontal overflow                                                                                         |
+| 10  | Mobile layout                                            | ✅ one panel, no horizontal overflow                                                                                          |
 | 11  | Every practice file renders                              | ✅ see the table below                                                                                                        |
 | 12  | Removed lesson routes are gone                           | ✅ `/lesson/jsx-rendering` → **404**                                                                                          |
 | 13  | Dev server binding                                       | ✅ listening socket is `127.0.0.1:3000` only                                                                                  |
 | 14  | **Code / Preview switch**                                | ✅ only one panel is visible at a time (`display: none` on the other); the switch updates `aria-pressed`                      |
 | 15  | **Error strip in Code view**                             | ✅ `role="alert"` above the editor; the **Details** button switches to the preview                                            |
 | 16  | **Switching back and forth**                             | ✅ the editor keeps its content and the sandbox keeps its rendered result (panels are hidden, not unmounted)                  |
+| 17  | **The editor fills its panel**                           | ✅ textarea 315 px (≈ 13 lines) instead of 74 px (≈ 2 lines)                                                               |
+| 18  | **The preview fills its panel**                          | ✅ iframe 319 px = the height of its box, instead of 150 px                                                                |
+| 19  | **No percentage heights left in the height path**        | ✅ verified by measuring the computed height of every box in the chain                                                     |
 
 **Per-file render results (all 8):**
 
@@ -552,6 +589,7 @@ Route (app)
 | `index.tsx`           | `<h2> Mingalarpar Online </h2><p>Age: <p>28</p></p>`                 |
 | `explicit_syntax.tsx` | _(empty — the component has no `return` statement; no error shown)_  |
 | `event_handler.tsx`   | _(no preview — the file is entirely commented out; a note is shown)_ |
+
 ### 11.3 Isolation checks (measured inside the sandbox frame)
 
 | Attempt                                                          | Result                                 |
@@ -583,20 +621,20 @@ the lesson-cleanup step.
 
 ### 11.5 STEP 5 — folder move + single-panel workspace
 
-| Check                                                                    | Result                                                                                          |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| The eight practice files live in `practice/`                             | ✅ `git mv` — history preserved (`R P2L3.tsx -> practice/P2L3.tsx`, …)                            |
-| The playground still discovers all eight                                  | ✅ 8 tabs in the tablist, sourced from `import.meta.glob("/practice/*.tsx", …)`                  |
-| The `?raw` Turbopack rule still applies                                   | ✅ the rule glob `"*.tsx"` has no `/`, so Turbopack matches it against the **file name**          |
-| Every practice file still renders                                         | ✅ all 8 verified in a real browser (table in §11.2)                                              |
-| The registry still resolves each file                                     | ✅ keys are file names only; the `practice/` prefix is stripped by `toFileName()`                  |
-| Only one panel is on screen                                               | ✅ the other section computes to `display: none`; the visible one is `flex`                       |
-| The switch updates `aria-pressed`                                         | ✅ `Code` / `Preview` buttons report the active view                                            |
-| The page still does not scroll on desktop                                  | ✅ `scrollHeight === innerHeight === 900`                                                        |
-| No horizontal overflow on desktop or mobile                                | ✅ checked at 1440 × 900 and 390 × 844                                                           |
-| The error is visible while the editor is on screen                        | ✅ a compact `role="alert"` strip sits above the editor, with a **Details** button               |
-| **Details** jumps to the preview                                          | ✅ clicking it sets the view to `preview` and the full message is shown                           |
-| Reset still restores the file from disk                                    | ✅ the buffer goes back to the on-disk source and the button becomes disabled                    |
+| Check                                              | Result                                                                                   |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| The eight practice files live in `practice/`       | ✅ `git mv` — history preserved (`R P2L3.tsx -> practice/P2L3.tsx`, …)                   |
+| The playground still discovers all eight           | ✅ 8 tabs in the tablist, sourced from `import.meta.glob("/practice/*.tsx", …)`          |
+| The `?raw` Turbopack rule still applies            | ✅ the rule glob `"*.tsx"` has no `/`, so Turbopack matches it against the **file name** |
+| Every practice file still renders                  | ✅ all 8 verified in a real browser (table in §11.2)                                     |
+| The registry still resolves each file              | ✅ keys are file names only; the `practice/` prefix is stripped by `toFileName()`        |
+| Only one panel is on screen                        | ✅ the other section computes to `display: none`; the visible one is `flex`              |
+| The switch updates `aria-pressed`                  | ✅ `Code` / `Preview` buttons report the active view                                     |
+| The page still does not scroll on desktop          | ✅ `scrollHeight === innerHeight === 900`                                                |
+| No horizontal overflow on desktop or mobile        | ✅ checked at 1440 × 900 and 390 × 844                                                   |
+| The error is visible while the editor is on screen | ✅ a compact `role="alert"` strip sits above the editor, with a **Details** button       |
+| **Details** jumps to the preview                   | ✅ clicking it sets the view to `preview` and the full message is shown                  |
+| Reset still restores the file from disk            | ✅ the buffer goes back to the on-disk source and the button becomes disabled            |
 
 ---
 
@@ -614,8 +652,8 @@ the lesson-cleanup step.
 | 8   | There is no ESLint configuration                                                             | `npx next lint` is not valid in Next 16                                        |
 | 9   | `import.meta.glob` is Turbopack-only                                                         | The project cannot be built with webpack                                       |
 | 10  | The editor and the preview cannot be seen at the same time                                   | By design — use the **Code / Preview** switch to move between them             |
-| 11  | The compile request is sent on every keystroke (debounced 400 ms)                             | The preview lags slightly behind very fast typing                              |
-
+| 11  | The compile request is sent on every keystroke (debounced 400 ms)                            | The preview lags slightly behind very fast typing                              |
+| 12  | The editor's scrollbar belongs to the `<textarea>`, not the panel                           | Cosmetic; the panel keeps its rounded border and focus ring                     |
 ---
 
 ## Appendix A — Command reference
@@ -671,13 +709,13 @@ checks `event.source === iframe.contentWindow`.
 
 ## Appendix C — Glossary
 
-| Term              | Meaning                                                                    |
-| ----------------- | -------------------------------------------------------------------------- |
+| Term              | Meaning                                                                      |
+| ----------------- | ---------------------------------------------------------------------------- |
 | **Practice file** | A `.tsx` file in `practice/` the learner edits. Never written to by the app. |
-| **View switch**   | The Code / Preview toggle. Only one panel is on screen at a time.          |
-| **Sandbox**       | The preview iframe and its document. Opaque origin, strict CSP.            |
-| **Token**         | A random string shared by the app and the sandbox; authenticates messages. |
-| **Vendor bundle** | React's CommonJS builds wrapped in a tiny `require` registry.              |
-| **Turbopack**     | Next 16's bundler. Provides `import.meta.glob` and the `?raw` rule.        |
-| **Sucrase**       | The TypeScript/JSX transformer used by the compile endpoint.               |
-| **FOUC**          | Flash of Unstyled Content — prevented by the inline theme boot script.     |
+| **View switch**   | The Code / Preview toggle. Only one panel is on screen at a time.            |
+| **Sandbox**       | The preview iframe and its document. Opaque origin, strict CSP.              |
+| **Token**         | A random string shared by the app and the sandbox; authenticates messages.   |
+| **Vendor bundle** | React's CommonJS builds wrapped in a tiny `require` registry.                |
+| **Turbopack**     | Next 16's bundler. Provides `import.meta.glob` and the `?raw` rule.          |
+| **Sucrase**       | The TypeScript/JSX transformer used by the compile endpoint.                 |
+| **FOUC**          | Flash of Unstyled Content — prevented by the inline theme boot script.       |
