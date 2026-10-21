@@ -6,7 +6,7 @@
  * *contents* instead of a module — see the `*.tsx` rule in
  * `next.config.ts`.
  *
- * The pattern is anchored at the project root, so it picks up the lesson
+ * The pattern is anchored at the project root, so it picks up the practice
  * files (`P2L3.tsx`, `p2l7.tsx`, …) and nothing else: `app/`, `components/`
  * and `lib/` live in sub-directories, and `node_modules` / `.next` are
  * never traversed.

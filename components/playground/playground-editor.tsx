@@ -23,7 +23,7 @@ type PlaygroundEditorProps = {
  * A small plain-text editor for the learner's practice files.
  *
  * A `<textarea>` is used rather than a full code editor library: the goal
- * is to show and tweak short lesson files, and a textarea keeps the
+ * is to show and tweak short practice files, and a textarea keeps the
  * bundle small and the keyboard behaviour native.
  */
 export function PlaygroundEditor({

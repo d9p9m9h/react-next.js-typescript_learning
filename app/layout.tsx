@@ -3,7 +3,7 @@ import { Inter, JetBrains_Mono, Noto_Sans_Myanmar } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { LabShell } from "@/components/lab-shell";
-import { ProgressProvider } from "@/components/progress-store";
+import { StorageCleanup } from "@/components/storage-cleanup";
 import { ThemeProvider } from "@/components/theme-provider";
 
 import "./globals.css";
@@ -73,9 +73,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         style={{ fontFamily: "var(--font-inter), var(--font-myanmar), sans-serif" }}
       >
         <ThemeProvider>
-          <ProgressProvider>
-            <LabShell>{children}</LabShell>
-          </ProgressProvider>
+          <StorageCleanup />
+          <LabShell>{children}</LabShell>
         </ThemeProvider>
       </body>
     </html>
