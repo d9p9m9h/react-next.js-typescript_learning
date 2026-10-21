@@ -496,12 +496,12 @@ resolved and silently falls back to `auto`, i.e. **the height of the element's o
 
 That is exactly what happened:
 
-| Box                                   | Before (broken) | After (fixed) |
-| ------------------------------------- | --------------- | ------------- |
-| Editor panel (`h-full`)               | 124 px         | 359 px       |
-| Scroll container                      | 81 px          | 315 px       |
-| `<textarea>` (≈ lines visible)        | 74 px (≈ 2)    | 315 px (≈ 13)|
-| Preview `<iframe>` (`h-full`)         | 150 px         | 319 px (fills)|
+| Box                            | Before (broken) | After (fixed)  |
+| ------------------------------ | --------------- | -------------- |
+| Editor panel (`h-full`)        | 124 px          | 359 px         |
+| Scroll container               | 81 px           | 315 px         |
+| `<textarea>` (≈ lines visible) | 74 px (≈ 2)     | 315 px (≈ 13)  |
+| Preview `<iframe>` (`h-full`)  | 150 px          | 319 px (fills) |
 
 **The rule:** in the height path, use **flex sizing** (`flex-1`, `min-h-0`) and avoid percentage
 heights entirely.
@@ -573,9 +573,9 @@ Route (app)
 | 14  | **Code / Preview switch**                                | ✅ only one panel is visible at a time (`display: none` on the other); the switch updates `aria-pressed`                      |
 | 15  | **Error strip in Code view**                             | ✅ `role="alert"` above the editor; the **Details** button switches to the preview                                            |
 | 16  | **Switching back and forth**                             | ✅ the editor keeps its content and the sandbox keeps its rendered result (panels are hidden, not unmounted)                  |
-| 17  | **The editor fills its panel**                           | ✅ textarea 315 px (≈ 13 lines) instead of 74 px (≈ 2 lines)                                                               |
-| 18  | **The preview fills its panel**                          | ✅ iframe 319 px = the height of its box, instead of 150 px                                                                |
-| 19  | **No percentage heights left in the height path**        | ✅ verified by measuring the computed height of every box in the chain                                                     |
+| 17  | **The editor fills its panel**                           | ✅ textarea 315 px (≈ 13 lines) instead of 74 px (≈ 2 lines)                                                                  |
+| 18  | **The preview fills its panel**                          | ✅ iframe 319 px = the height of its box, instead of 150 px                                                                   |
+| 19  | **No percentage heights left in the height path**        | ✅ verified by measuring the computed height of every box in the chain                                                        |
 
 **Per-file render results (all 8):**
 
@@ -653,7 +653,8 @@ the lesson-cleanup step.
 | 9   | `import.meta.glob` is Turbopack-only                                                         | The project cannot be built with webpack                                       |
 | 10  | The editor and the preview cannot be seen at the same time                                   | By design — use the **Code / Preview** switch to move between them             |
 | 11  | The compile request is sent on every keystroke (debounced 400 ms)                            | The preview lags slightly behind very fast typing                              |
-| 12  | The editor's scrollbar belongs to the `<textarea>`, not the panel                           | Cosmetic; the panel keeps its rounded border and focus ring                     |
+| 12  | The editor's scrollbar belongs to the `<textarea>`, not the panel                            | Cosmetic; the panel keeps its rounded border and focus ring                    |
+
 ---
 
 ## Appendix A — Command reference
