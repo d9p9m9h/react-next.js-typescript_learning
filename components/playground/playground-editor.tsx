@@ -17,6 +17,13 @@ type PlaygroundEditorProps = {
   onReset?: () => void;
   /** True when the buffer differs from the file on disk. */
   dirty?: boolean;
+  /**
+   * The highlighted source, as HTML.
+   *
+   * The overlay behind the textarea shows it; the textarea's own text
+   * stays transparent, so the caret and the selection still work.
+   */
+  highlighted?: string;
 };
 
 /**
@@ -34,8 +41,10 @@ export function PlaygroundEditor({
   status,
   onReset,
   dirty = false,
+  highlighted,
 }: PlaygroundEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
 
   // Keep Tab inside the editor instead of moving focus away from it.
   useEffect(() => {
@@ -60,6 +69,64 @@ export function PlaygroundEditor({
     textarea.addEventListener("keydown", handleKeyDown);
     return () => textarea.removeEventListener("keydown", handleKeyDown);
   }, [value, onChange]);
+
+  /**
+   * Scrolls the highlight layer together with the textarea.
+   *
+   * The two layers are separate boxes, so the textarea's scroll
+   * position has to be copied onto the highlighted one — otherwise the
+   * colours would drift away from the text as soon as the code is
+   * longer than the box.
+   *
+   * The textarea's own scrollbar makes its content box a few pixels
+   * narrower than the layer, so the layer is also nudged by the
+   * difference; without it the coloured text would sit a fraction of
+   * a pixel to the left of the caret.
+   */
+  function handleScroll() {
+    const textarea = textareaRef.current;
+    const pre = preRef.current;
+    if (!textarea || !pre) return;
+
+    pre.scrollTop = textarea.scrollTop;
+    pre.scrollLeft = textarea.scrollLeft;
+  }
+
+  /**
+   * Keeps the two layers the same width.
+   *
+   * The layer fills the panel, while the textarea's scrollbar takes a
+   * few pixels away from the textarea's content box. The layer is
+   * therefore padded by the difference, so the two content boxes have
+   * exactly the same width and the coloured text sits on the same
+   * pixel as the caret.
+   */
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    const pre = preRef.current;
+    if (!textarea || !pre) return;
+
+    function sync() {
+      // The layer fills the panel, while the textarea's scrollbar
+      // takes a few pixels away from its content box. The difference
+      // is added to the layer's right padding, so the two content boxes
+      // end up exactly the same width.
+      const gutter = preElement.clientWidth - textareaElement.clientWidth;
+      preElement.style.paddingRight = `${16 + Math.max(0, gutter)}px`;
+    }
+
+    const textareaElement = textarea;
+    const preElement = pre;
+
+    sync();
+
+    const observer = new ResizeObserver(sync);
+    observer.observe(textareaElement);
+
+    return () => observer.disconnect();
+    // The layer is only rendered once the first compile has answered,
+    // so the effect has to run again when that happens.
+  }, [highlighted]);
 
   const statusLabel = {
     idle: "Ready",
@@ -149,7 +216,33 @@ export function PlaygroundEditor({
         item that grows — the container only provides the focus ring
         and the padding-free frame around it.
       */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[var(--accent)]">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[var(--accent)]">
+        {/*
+          The highlight layer.
+
+          It is a `<pre>` behind the textarea with the same padding,
+          font and line height, so the coloured text lines up exactly
+          with the transparent text of the textarea.
+
+          `whitespace-pre` is what keeps the layer from wrapping: the
+          textarea uses `wrap="off"`, so a long line stays on one
+          line there and has to stay on one line here too.
+
+          The layer is `inset-0`, so it is exactly as wide as the
+          panel, while the textarea's scrollbar takes a few pixels
+          away from its content box. The two are therefore offset by
+          the width of the scrollbar, which is corrected in
+          `handleScroll` — the layer is moved by the difference.
+        */}
+        {highlighted ? (
+          <pre
+            ref={preRef}
+            aria-hidden="true"
+            className="scrollbar-slim pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre p-4 font-mono text-[13px] leading-relaxed text-[var(--text-strong)]"
+            dangerouslySetInnerHTML={{ __html: highlighted }}
+          />
+        ) : null}
+
         <label className="sr-only" htmlFor="playground-source">
           {fileName} ရဲ့ source code
         </label>
@@ -158,10 +251,24 @@ export function PlaygroundEditor({
           ref={textareaRef}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onScroll={handleScroll}
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="scrollbar-slim min-h-0 w-full flex-1 resize-none overflow-auto bg-transparent p-4 font-mono text-[13px] leading-relaxed text-[var(--text-strong)] outline-none"
+          /*
+           * `wrap="off"` turns the soft wrapping off, so a long line
+           * stays on one line and the pane scrolls sideways instead.
+           * That is what a code editor does, and it is the only way the
+           * caret can sit *on* a character instead of in the middle of
+           * a wrapped line.
+           */
+          wrap="off"
+          className={[
+            "scrollbar-slim min-h-0 w-full flex-1 resize-none overflow-auto bg-transparent p-4 font-mono text-[13px] leading-relaxed outline-none",
+            highlighted
+              ? "text-transparent caret-[var(--text-strong)] selection:bg-[var(--accent)]/30"
+              : "text-[var(--text-strong)]",
+          ].join(" ")}
         />
       </div>
     </div>

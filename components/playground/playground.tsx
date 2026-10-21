@@ -11,12 +11,19 @@ import {
   type SandboxLogEntry,
 } from "@/components/playground/playground-preview";
 import {
+  PlaygroundPropsEditor,
+  type EditablePropValue,
+} from "@/components/playground/playground-props-editor";
+import {
   PlaygroundViewToggle,
   type PlaygroundView,
 } from "@/components/playground/playground-view-toggle";
+import { PlaygroundWidthToggle } from "@/components/playground/playground-width-toggle";
 import { useTheme } from "@/components/theme-provider";
+import { readDrafts, removeDraft, writeDrafts } from "@/lib/playground/drafts";
 import type { PlaygroundFile } from "@/lib/playground/files";
 import { playgroundTargets } from "@/lib/playground/registry";
+import type { TypeDiagnostic } from "@/lib/playground/typecheck";
 
 type PlaygroundProps = {
   /** Every `.tsx` file found in the `practice/` folder. */
@@ -51,6 +58,10 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
   const [compiledCode, setCompiledCode] = useState<string | null>(null);
   const [compiledCss, setCompiledCss] = useState<string | null>(null);
+  /** The highlighted source, as HTML, for the code pane. */
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  /** The type errors found in the current source. */
+  const [typeDiagnostics, setTypeDiagnostics] = useState<TypeDiagnostic[]>([]);
   /**
    * Which panel is on screen.
    *
@@ -60,6 +71,24 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
    * switches back and forth.
    */
   const [view, setView] = useState<PlaygroundView>("code");
+  /**
+   * The width the preview is shown at.
+   *
+   * `null` means the preview fills its panel. A fixed width lets the
+   * learner see how a responsive component behaves on a phone or a
+   * tablet.
+   */
+  const [previewWidth, setPreviewWidth] = useState<number | null>(null);
+  /**
+   * The prop values the learner has changed in the props panel.
+   *
+   * They are applied on top of the registry's own values, so a
+   * component can be tried with different input without editing the
+   * file.
+   */
+  const [propOverrides, setPropOverrides] = useState<
+    Record<string, EditablePropValue>
+  >({});
 
   // Prevents a stale compile response from replacing newer editor contents.
   const requestIdRef = useRef(0);
@@ -77,10 +106,71 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
     [files, activeName],
   );
 
+  /**
+   * Restores the saved drafts on the first mount.
+   *
+   * The drafts live in `localStorage`, so they are only available on
+   * the client. They are applied in an effect (not in the state
+   * initialiser) so the server-rendered markup and the first client
+   * render agree.
+   */
+  const draftsRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (draftsRestoredRef.current) return;
+    draftsRestoredRef.current = true;
+
+    const drafts = readDrafts();
+    if (Object.keys(drafts).length === 0) return;
+
+    setBuffers((prev) => {
+      const next = { ...prev };
+
+      for (const file of files) {
+        const draft = drafts[file.name];
+        if (draft !== undefined) next[file.name] = draft;
+      }
+
+      return next;
+    });
+  }, [files]);
+
+  /**
+   * Saves the edited buffers as drafts.
+   *
+   * Only the files that actually differ from disk are stored, so the
+   * payload stays small and a file the learner did not touch is never
+   * shadowed by a stale draft.
+   */
+  useEffect(() => {
+    if (!draftsRestoredRef.current) return;
+
+    const drafts: Record<string, string> = {};
+
+    for (const file of files) {
+      const buffer = buffers[file.name];
+      if (buffer !== undefined && buffer !== file.source) {
+        drafts[file.name] = buffer;
+      }
+    }
+
+    writeDrafts(drafts);
+  }, [buffers, files]);
+
   const source = activeFile ? (buffers[activeFile.name] ?? "") : "";
   const target = activeFile ? playgroundTargets[activeFile.name] : undefined;
   const componentName = target?.component ?? "default";
-  const props = target?.props ?? {};
+  const registryProps = target?.props ?? {};
+
+  /**
+   * The props actually handed to the component.
+   *
+   * The learner's overrides win over the registry's values.
+   */
+  const props = useMemo(
+    () => ({ ...registryProps, ...propOverrides }),
+    [registryProps, propOverrides],
+  );
 
   /**
    * Some practice files are entirely commented out, so there is nothing to
@@ -111,6 +201,8 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
           ok: boolean;
           code?: string;
           css?: string;
+          html?: string;
+          diagnostics?: TypeDiagnostic[];
           error?: string;
         };
 
@@ -121,11 +213,15 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
           setCompileError(result.error ?? "Compile မအောင်မြင်ပါ။");
           setCompiledCode(null);
           setCompiledCss(null);
+          setHighlightedHtml(null);
+          setTypeDiagnostics([]);
           return;
         }
 
         setCompiledCode(result.code);
         setCompiledCss(result.css);
+        setHighlightedHtml(result.html ?? null);
+        setTypeDiagnostics(result.diagnostics ?? []);
         setStatus("ok");
       } catch (error) {
         if (signal.aborted || requestId !== requestIdRef.current) return;
@@ -137,6 +233,8 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
         );
         setCompiledCode(null);
         setCompiledCss(null);
+        setHighlightedHtml(null);
+        setTypeDiagnostics([]);
       }
     },
     [componentName],
@@ -228,6 +326,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
       ...prev,
       [activeFile.name]: activeFile.source,
     }));
+    removeDraft(activeFile.name);
   }
 
   /**
@@ -368,6 +467,43 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
             </div>
           ) : null}
 
+          {/*
+            The type errors.
+
+            They are *not* compile errors — the code still runs — so
+            they get their own, quieter panel under the editor.
+          */}
+          {typeDiagnostics.length > 0 ? (
+            <div
+              role="status"
+              className="mb-2 flex shrink-0 flex-col gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                Type error · {typeDiagnostics.length} ခု
+              </p>
+              <ul className="flex flex-col gap-1">
+                {typeDiagnostics.slice(0, 4).map((diagnostic) => (
+                  <li
+                    key={`${diagnostic.code}-${diagnostic.start}`}
+                    className="text-[11px] leading-5 text-amber-800 dark:text-amber-200"
+                  >
+                    <span className="font-mono font-semibold">
+                      {diagnostic.line}:{diagnostic.column}
+                    </span>{" "}
+                    <span className="text-amber-700/80 dark:text-amber-300/90">
+                      {diagnostic.message}
+                    </span>
+                  </li>
+                ))}
+                {typeDiagnostics.length > 4 ? (
+                  <li className="text-[10px] font-semibold text-amber-700/70 dark:text-amber-300/70">
+                    နောက်ထပ် {typeDiagnostics.length - 4} ခု ရှိပါတယ်
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
+
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <PlaygroundEditor
               value={source}
@@ -377,7 +513,38 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
               status={hasNoComponent ? "idle" : status}
               onReset={handleReset}
               dirty={dirty}
+              highlighted={highlightedHtml ?? undefined}
             />
+
+            {/*
+              The props panel.
+
+              It sits under the editor, so the preview below it keeps
+              the space it needs while the values stay reachable.
+            */}
+            {Object.keys(registryProps).length > 0 ? (
+              <details className="group mt-2 shrink-0 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)]">
+                <summary className="cursor-pointer list-none px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)] transition-colors hover:text-[var(--text-strong)]">
+                  Props · တန်းဖြည့်လို့ရမယ့် တန်ဖ
+                </summary>
+                <div className="border-t border-[var(--surface-border)] px-4 py-3">
+                  <PlaygroundPropsEditor
+                    props={registryProps}
+                    overrides={propOverrides}
+                    onChange={(name, value) =>
+                      setPropOverrides((prev) => ({ ...prev, [name]: value }))
+                    }
+                    onReset={(name) =>
+                      setPropOverrides((prev) => {
+                        const next = { ...prev };
+                        delete next[name];
+                        return next;
+                      })
+                    }
+                  />
+                </div>
+              </details>
+            ) : null}
           </div>
         </section>
 
@@ -399,7 +566,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
             Preview · ရလဒ်
           </h2>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-raised)]">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--surface-border)] px-3 py-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--surface-border)] px-3 py-2">
               <div className="flex items-center gap-2">
                 <span
                   aria-hidden="true"
@@ -416,19 +583,25 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
                   Rendered result
                 </span>
               </div>
-              <span
-                aria-live="polite"
-                className={[
-                  "rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                  hasError
-                    ? "border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                    : status === "compiling"
-                      ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                      : "border-[var(--surface-border)] text-[var(--text-subtle)]",
-                ].join(" ")}
-              >
-                {hasError ? "error" : status === "compiling" ? "compiling" : "live"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  aria-live="polite"
+                  className={[
+                    "rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                    hasError
+                      ? "border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                      : status === "compiling"
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                        : "border-[var(--surface-border)] text-[var(--text-subtle)]",
+                  ].join(" ")}
+                >
+                  {hasError ? "error" : status === "compiling" ? "compiling" : "live"}
+                </span>
+                <PlaygroundWidthToggle
+                  value={previewWidth}
+                  onChange={setPreviewWidth}
+                />
+              </div>
             </div>
 
             <div className="relative flex min-h-0 flex-1 flex-col">
@@ -447,6 +620,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
                     component={componentName}
                     props={props}
                     theme={resolvedTheme}
+                    width={previewWidth}
                     onLog={handleSandboxLog}
                     onError={handleSandboxError}
                     onRendered={handleSandboxRendered}

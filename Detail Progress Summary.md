@@ -16,6 +16,7 @@
 | 2026-10-21 | **STEP 5** — practice files moved from the project root into `practice/`; the editor and the preview now take turns via a **Code / Preview** switch (one panel at a time). |
 | 2026-10-22 | Preview styles are compiled from the current TSX source with Tailwind CSS v4 and injected into the sandboxed iframe. |
 | 2026-10-22 | Added responsive Split / Code / Preview modes, cancelled stale live-compile requests, and tightened the workspace layout. |
+| 2026-10-22 | Added **syntax highlighting**, **real TypeScript type-checking**, **auto-saved drafts**, **editable props**, and **preview device widths**. |
 
 ---
 
@@ -401,12 +402,14 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | `components/theme-provider.tsx`                       | 84    | Theme state             |
 | `components/theme-toggle.tsx`                         | 54    | Theme switch            |
 | `components/storage-cleanup.tsx`                      | 17    | Obsolete-key cleanup    |
-| `components/playground/playground.tsx`                | 424   | The workspace           |
-| `components/playground/playground-view-toggle.tsx`    | 65    | Split / Code / Preview switch |
-| `components/playground/playground-editor.tsx`         | 153   | Editor + Reset          |
-| `components/playground/playground-preview.tsx`        | 225   | Iframe + message bridge |
+| `components/playground/playground.tsx`                | 605   | The workspace           |
+| `components/playground/playground-view-toggle.tsx`    | 63    | Split / Code / Preview switch |
+| `components/playground/playground-editor.tsx`         | 248   | Editor + Reset + highlight layer |
+| `components/playground/playground-preview.tsx`        | 255   | Iframe + message bridge |
 | `components/playground/playground-console.tsx`        | 75    | Console panel           |
 | `components/playground/playground-error-boundary.tsx` | 61    | Error boundary          |
+| `components/playground/playground-width-toggle.tsx`   | 71    | Full / Phone / Tablet / Laptop |
+| `components/playground/playground-props-editor.tsx`   | 130   | Editable props panel    |
 
 ### 8.3 Library
 
@@ -420,6 +423,9 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | `lib/playground/styles.ts`          | 29    | Generates Tailwind CSS for the active TSX source |
 | `lib/playground/vendor.ts`          | 189   | Builds the React runtime bundle for the iframe |
 | `lib/playground/sandbox-runtime.ts` | 383   | Runs inside the iframe                         |
+| `lib/playground/typecheck.ts`       | 237   | Runs the TypeScript 7 checker over the source  |
+| `lib/playground/highlight.ts`       | 67    | Prism highlighting for the code pane            |
+| `lib/playground/drafts.ts`          | 75    | Auto-saved drafts in `localStorage`            |
 
 ### 8.4 Practice files (never modified by the app)
 
@@ -433,10 +439,12 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 
 ### 8.6 Dependencies
 
-**Runtime:** `next` `react` `react-dom` `sucrase` `tailwindcss` `typescript` `@tailwindcss/postcss` `@tailwindcss/oxide` `postcss`
-**Dev:** `@types/node` `@types/react` `@types/react-dom`
+**Runtime:** `next` `react` `react-dom` `sucrase` `tailwindcss` `typescript` `@tailwindcss/postcss` `@tailwindcss/oxide` `postcss` `prismjs`
+**Dev:** `@types/node` `@types/react` `@types/react-dom` `@types/prismjs`
 
-Every one of these is used. `prism-react-renderer` was removed together with the lesson code pane.
+Every one of these is used. `prism-react-renderer` was removed together with the lesson code pane;
+`prismjs` + `@types/prismjs` were added on 2026-10-22 for the playground's own syntax
+highlighting.
 
 ---
 
@@ -491,13 +499,24 @@ Burmese text renders correctly.
 | 1440 × 900 | **One** panel fills the width (579 px) + console (160 px). `scrollHeight === 900` — the page does **not** scroll. |
 | 390 × 844  | The visible panel is 492 px + console 160 px. No horizontal overflow.                                             |
 
-The updated Split / Code / Preview layout has not yet been measured in a browser.
+The updated Split / Code / Preview layout **was** measured in a browser — see §11.6.
 
 In Split mode, both panels are visible side by side on desktop and the editor remains visible on
 small screens; Code and Preview modes show just the selected panel. Hidden panels remain mounted,
 so the editor keeps its cursor position and the sandbox keeps its rendered result when switching.
 The breakpoint is `lg`; panels have a 320 px minimum height on small screens and fill the available
 workspace height on desktop.
+
+**The `dark:` variant** is declared explicitly in `app/globals.css`:
+
+```css
+@custom-variant dark (&:where(.dark, .dark *));
+```
+
+The app and the preview both drive their colour scheme from a `.dark` class on `<html>`, not from
+the operating system's preference. Without this declaration Tailwind emits the `dark:` utilities
+inside a `@media (prefers-color-scheme: dark)` query, so they never match the class the app
+actually toggles — the preview would keep the light colours in dark mode.
 
 ### 10.1 The height chain — why `h-full` collapses the editor
 
@@ -544,6 +563,97 @@ above the editor (`role="alert"`, truncated message, a **Details** button). The 
 still lives over the preview, but the learner may be looking at the editor — and the **Details**
 button switches the view to the preview, where the whole message is shown.
 
+### 10.3 Syntax highlighting
+
+The code pane shows the source in colour. The highlighting is done **on the server**, by Prism, and
+the resulting HTML is sent alongside the compiled code.
+
+The implementation is in `lib/playground/highlight.ts`:
+
+- Prism's language definitions are **plugins** that register themselves on a global `Prism`
+  object, so the three components the TSX grammar needs — `prism-typescript.js`, `prism-jsx.js`
+  and `prism-tsx.js` — are read from `node_modules/prismjs/components` and evaluated once, on the
+  first call. The result is cached.
+- `Prism.highlight(source, Prism.languages.tsx, "tsx")` returns Prism's own markup:
+  `<span class="token keyword">…</span>` and friends.
+
+The HTML is rendered in a `<pre aria-hidden="true">` **behind** the `<textarea>`. The textarea's
+own text is transparent, so the browser still owns the caret, the selection and the keyboard, while
+the coloured layer shows through. Both layers use the same padding, font size and line height, and
+the textarea's scroll position is copied onto the layer on every scroll, so the colours stay
+aligned with the text.
+
+The token colours are defined in `app/globals.css` as `--code-keyword`, `--code-string`,
+`--code-number`, `--code-function`, `--code-operator`, `--code-punctuation` and `--code-regex`, so
+they follow the app's own Emerald/Gold palette in both light and dark mode.
+
+The code pane does **not** wrap long lines. The `<textarea>` uses `wrap="off"`, so a long line stays
+on one line and the pane scrolls sideways — that is what a code editor does, and it is the only way
+the caret can sit *on* a character instead of in the middle of a wrapped line. The highlight layer
+uses `whitespace-pre` for the same reason, and the two layers are kept the same width with a
+`ResizeObserver` (the textarea's scrollbar makes its content box a few pixels narrower than the
+layer, and the difference is added to the layer's right padding).
+
+### 10.4 Type checking
+
+Sucrase only *strips* types — it never checks them, so a wrong type used to pass silently. The
+playground now runs the **real TypeScript checker** over the edited source.
+
+`lib/playground/typecheck.ts` uses the **TypeScript 7 native API** (`typescript/unstable/sync`),
+which drives the `tsgo` binary that ships with the `typescript` package. The API talks to a
+long-lived compiler process over a pipe, so the program is built **once** and reused for every
+edit.
+
+The edited source is handed to the compiler through a **virtual file system overlay**: the
+compiler's `readFile` callback returns the edited text for the practice file and reads everything
+else from disk. The learner's files are therefore never touched, and `react` and its types resolve
+exactly as they do in the project.
+
+| Measurement                    | Time    |
+| ------------------------------ | ------- |
+| Cold program (first check)     | ~1.5 s  |
+| Re-check of an edited file     | ~2–7 ms |
+| Full compile request (warm)    | ~200 ms |
+
+The diagnostics are **not** compile errors — the code still compiles and still renders — so they
+get their own, quieter panel under the editor (`role="status"`, an amber border, the line and
+column of each problem). The preview keeps working.
+
+### 10.5 Auto-saved drafts
+
+The playground never writes to the learner's files, so an edit used to be lost on a refresh.
+`lib/playground/drafts.ts` keeps the edited buffers in `localStorage` under
+`react-lab-playground-drafts`.
+
+- Only the files that **differ from disk** are stored, so the payload stays small and an untouched
+  file is never shadowed by a stale draft.
+- The drafts are restored in an effect after the first mount, so the server-rendered markup and the
+  first client render agree.
+- The **Reset** button drops the draft as well as restoring the on-disk source.
+- Storage can be unavailable (private mode, a locked-down browser), so every function fails
+  silently. A missing draft store never breaks the editor.
+
+### 10.6 Editable props
+
+The practice files take their props from a small registry (see `lib/playground/registry.tsx`).
+`components/playground/playground-props-editor.tsx` puts a small panel under the editor — a
+`<details>` element, so it stays out of the way — where those values can be changed.
+
+- Only the **primitive** props are editable. A prop that holds a React element (like
+  `index.tsx`'s `age`) is shown read-only, because it cannot be typed into a text field.
+- The values the learner changes are applied **on top of** the registry's own values and are
+  re-sent to the sandbox, so the preview updates immediately.
+- A `↺` button removes one override and restores the registry's value.
+
+### 10.7 Preview device widths
+
+`components/playground/playground-width-toggle.tsx` sits next to the preview's status badge and
+offers **Full** (fill the panel), **Phone** (390 px), **Tablet** (768 px) and **Laptop** (1280 px).
+
+A fixed width is centred inside the panel and gets its own border and rounded corners, so a
+responsive component can be checked at the size it would really have on a device. The frame still
+fills the panel when no width is chosen.
+
 ---
 
 ## 11. Verification results
@@ -563,9 +673,13 @@ The production build could not be re-verified in this sandbox: Turbopack's CSS w
 the build process could connect to it.
 
 **Layout follow-up on 2026-10-22:** `npm run typecheck` passed after adding Split / Code / Preview
-views and cancelling superseded compile requests. Visual browser verification was unavailable
-because the local dev server could not be reached by the integrated browser; `next build` remains
-blocked by the same Turbopack CSS-worker startup failure.
+views and cancelling superseded compile requests. The layout was then measured in a real browser
+against `next dev` — see §11.6.
+
+**Feature follow-up on 2026-10-22 (syntax highlighting, type checking, drafts, props, device
+widths):** `npm run typecheck` passed with exit code 0. The `prismjs` and `@types/prismjs` packages
+were added; `typescript` was already a dependency and provides the native `tsgo` binary the type
+checker drives. Every new feature was exercised in a real browser — see §11.6.
 
 Build output route table:
 
@@ -661,6 +775,36 @@ the lesson-cleanup step.
 | **Details** jumps to the preview                   | ✅ clicking it sets the view to `preview` and the full message is shown                  |
 | Reset still restores the file from disk            | ✅ the buffer goes back to the on-disk source and the button becomes disabled            |
 
+### 11.6 Split mode + the new features (2026-10-22)
+
+Measured in a real browser against `next dev` at **1240 × 817** and **390 × 844**.
+
+| #   | Check                                                     | Result                                                                                             |
+| --- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 20  | **Split mode** shows both panels                         | ✅ `gridTemplateColumns: 580.014px 580.014px`; editor 578 px, iframe 578 px, both 460 px tall     |
+| 21  | The page does not scroll sideways in Split mode          | ✅ `scrollWidth === innerWidth === 1240`                                                            |
+| 22  | The **Split** button is hidden on mobile                 | ✅ `display: none` at 390 × 844; `scrollWidth === innerWidth === 390`                               |
+| 23  | **Syntax highlighting** is rendered                      | ✅ 121 `.token` spans for `P2L3.tsx`; the textarea's colour is `rgba(0, 0, 0, 0)`                   |
+| 24  | The highlight layer lines up with the textarea           | ✅ both boxes are `x: 32.9, y: 200.6, 1174.2 × 459.8`                                             |
+| 25  | The token colours follow the theme                       | ✅ keyword `lab(45.06 …)` in light, `lab(77.87 …)` in dark                                         |
+| 26  | **Type errors** are reported                              | ✅ `useState<number>('')` → 2 errors, listed as `5:47` and `8:14` with the compiler's own messages   |
+| 27  | A type error does **not** break the preview               | ✅ the status badge still says `live` and the component still renders                               |
+| 28  | **Reset** clears the type errors and the `edited` badge   | ✅ the panel disappears and the button becomes disabled                                             |
+| 29  | **Drafts survive a reload**                              | ✅ the edit was still in the textarea after `page.reload()`; the draft was in `localStorage`          |
+| 30  | **The props panel** lists the registry's props            | ✅ `p2l7.tsx` → `title`, `durationMinutes`, `instructor` with their registry values                  |
+| 31  | **A prop override reaches the preview**                  | ✅ `title` → "Course Title Changed" rendered as the `<h2>` inside the iframe                         |
+| 32  | **The device-width toggle** resizes the frame             | ✅ Phone → the frame is 390 px wide with a border and 8 px radius; Full → 1174 px                   |
+| 33  | The width toggle is reachable on mobile                   | ✅ the Phone button is present at 390 × 844                                                        |
+| 34  | The compile API returns the new payloads                 | ✅ `code` 953 B, `css` 8483 B, `html` 5353 B, `diagnostics` 0 — in 4.4 s cold / 197 ms warm          |
+| 35  | **The code pane scrolls sideways** instead of wrapping    | ✅ `wrap="off"`, `white-space: pre`; a 220-character line gives `scrollWidth 1982 > clientWidth 1164` |
+| 36  | The highlight layer scrolls with the textarea            | ✅ `pre.scrollLeft === textarea.scrollLeft` after a 300 px scroll                                |
+| 37  | The two layers have the same content width               | ✅ 1132 px each; the layer's right padding absorbs the 10 px scrollbar gutter                      |
+| 38  | The **`dark:` variant** works in the preview              | ✅ the card is emerald-950 and the heading is gold-400 in dark mode (it stayed white before)        |
+
+The compile API was also called directly with a deliberately broken file
+(`useState<number>('')` instead of `useState<string>('')`); it returned the two expected
+`TS2345` diagnostics.
+
 ---
 
 ## 12. Remaining known limitations
@@ -669,7 +813,7 @@ the lesson-cleanup step.
 | --- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | 1   | The sandbox is **not** a security boundary — code inside it can forge console/error messages | Cosmetic spoofing of the console panel only                                    |
 | 2   | `POST /api/playground/compile` is unauthenticated                                            | Only reachable on 127.0.0.1; it transforms, never executes                     |
-| 3   | The compile step does **not** type-check                                                     | Type errors pass silently; only syntax errors are caught                       |
+| 3   | The compile step does **not** type-check                                                     | **Fixed on 2026-10-22** — the real TypeScript checker now runs (§10.4)                          |
 | 4   | `index.tsx` renders `<p>` inside `<p>`                                                       | React logs "cannot be a descendant of `<p>`" — this is the learner's own file  |
 | 5   | `explicit_syntax.tsx` has no `return` statement                                              | The preview is empty; no error is reported (React allows a `undefined` return) |
 | 6   | `event_handler.tsx` is entirely commented out                                                | Shows a note instead of a preview — expected                                   |
@@ -679,6 +823,8 @@ the lesson-cleanup step.
 | 10  | Split mode shows the editor and preview together only on desktop                             | On small screens, use the **Code / Preview** views to preserve usable space     |
 | 11  | The compile request is sent after typing pauses (debounced 180 ms)                           | Very fast typing still waits briefly before recompiling                        |
 | 12  | The editor's scrollbar belongs to the `<textarea>`, not the panel                            | Cosmetic; the panel keeps its rounded border and focus ring                    |
+| 13  | The first type check of a session costs ~1.5 s                                            | The compiler process is started once and then reused; later checks cost ~2–7 ms |
+| 14  | The `tsgo` compiler process outlives the request                                           | It is a long-lived child of the dev server; `closeTypeChecker()` shuts it down  |
 
 ---
 
@@ -711,7 +857,7 @@ Defined in `lib/playground/protocol.ts`.
 
 | Type     | Payload                                   |
 | -------- | ----------------------------------------- |
-| `render` | `{ token, type, code, component, props }` |
+| `render` | `{ token, type, code, css, component, props }` |
 | `theme`  | `{ token, type, theme }`                  |
 | `clear`  | `{ token, type }`                         |
 
@@ -744,4 +890,6 @@ checks `event.source === iframe.contentWindow`.
 | **Vendor bundle** | React's CommonJS builds wrapped in a tiny `require` registry.                |
 | **Turbopack**     | Next 16's bundler. Provides `import.meta.glob` and the `?raw` rule.          |
 | **Sucrase**       | The TypeScript/JSX transformer used by the compile endpoint.                 |
+| **tsgo**          | The native TypeScript 7 compiler binary; drives the type checker.            |
+| **Draft**         | An unsaved edit, kept in `localStorage` until it is reset or saved to disk.  |
 | **FOUC**          | Flash of Unstyled Content — prevented by the inline theme boot script.       |

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createSandboxToken,
@@ -40,6 +40,13 @@ type PlaygroundPreviewProps = {
   props: Record<string, unknown>;
   /** The current colour scheme, so the preview matches the app. */
   theme: "light" | "dark";
+  /**
+   * The width the preview is shown at, in CSS pixels.
+   *
+   * `null` means "fill the panel". A fixed width is used to see how
+   * the component behaves on a phone or a tablet.
+   */
+  width?: number | null;
   /** Called for every console line the learner's code produces. */
   onLog: (entry: SandboxLogEntry) => void;
   /** Called when the sandbox reports a runtime problem. */
@@ -75,6 +82,7 @@ export function PlaygroundPreview({
   component,
   props,
   theme,
+  width = null,
   onLog,
   onError,
   onRendered,
@@ -101,11 +109,25 @@ export function PlaygroundPreview({
   }, []);
 
   /**
-   * The latest props are kept in a ref so the message listener can always
-   * read the current values without being re-registered on every render.
+   * The props, serialised for the sandbox.
+   *
+   * The result is memoised on the props themselves, so the render
+   * effect below re-runs when a value changes — and not on every
+   * unrelated render of the page.
    */
-  const propsRef = useRef(props);
-  propsRef.current = props;
+  const serialized = useMemo(() => {
+    try {
+      return { ok: true as const, props: serializeProps(props) };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Props ကို preview ထဲကို ပို့လို့ မရပါ။",
+      };
+    }
+  }, [props]);
 
   /**
    * Handles the messages the sandbox sends back.
@@ -187,18 +209,8 @@ export function PlaygroundPreview({
       return;
     }
 
-    let payload: Record<string, unknown>;
-
-    try {
-      payload = serializeProps(propsRef.current);
-    } catch (error) {
-      onError({
-        kind: "runtime",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Props ကို preview ထဲကို ပို့လို့ မရပါ။",
-      });
+    if (!serialized.ok) {
+      onError({ kind: "runtime", message: serialized.error });
       return;
     }
 
@@ -208,9 +220,9 @@ export function PlaygroundPreview({
       code,
       css,
       component,
-      props: payload,
+      props: serialized.props,
     });
-  }, [ready, token, code, css, component, post, onError]);
+  }, [ready, token, code, css, component, serialized, post, onError]);
 
   // Keep the preview's colour scheme in sync with the app.
   useEffect(() => {
@@ -220,34 +232,52 @@ export function PlaygroundPreview({
   }, [ready, token, theme, post]);
 
   return (
-    <iframe
-      ref={iframeRef}
-      // The `src` is set only once the client-side token exists, so the
-      // server-rendered markup and the browser agree on it.
-      src={
-        token === null
-          ? undefined
-          : `/playground/sandbox?token=${encodeURIComponent(token)}`
-      }
-      title="Playground preview"
-      /*
-       * The frame fills the box it is given.
-       *
-       * `h-full` (i.e. `height: 100%`) cannot be used here: the
-       * parent is a **flex item**, so its height comes from the flex
-       * layout rather than from a definite box, and a percentage
-       * height against an indefinite height falls back to `auto` —
-       * which would collapse the frame to a couple of lines.
-       *
-       * As a flex item of a flex column, the frame simply grows to
-       * fill the remaining space.
-       */
-      className="min-h-0 w-full flex-1 border-0"
-      // `allow-scripts` lets the learner's code run. `allow-same-origin`
-      // is deliberately **not** granted: with it, the frame would share
-      // this page's origin and could reach the app's DOM and storage.
-      sandbox="allow-scripts"
-      referrerPolicy="no-referrer"
-    />
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-auto">
+      {/*
+        The frame.
+
+        A fixed width is centred inside the panel, so a phone-sized
+        preview can be seen next to the space it would really have on
+        a device. The frame still fills the panel when no width is
+        chosen.
+      */}
+      <div
+        className={[
+          "mx-auto flex min-h-0 w-full flex-1 flex-col",
+          width ? "shrink-0 rounded-lg border border-[var(--surface-border)]" : "",
+        ].join(" ")}
+        style={width ? { width: `${width}px`, maxWidth: "100%" } : undefined}
+      >
+        <iframe
+          ref={iframeRef}
+          // The `src` is set only once the client-side token exists, so
+          // the server-rendered markup and the browser agree on it.
+          src={
+            token === null
+              ? undefined
+              : `/playground/sandbox?token=${encodeURIComponent(token)}`
+          }
+          title="Playground preview"
+          /*
+           * The frame fills the box it is given.
+           *
+           * `h-full` (i.e. `height: 100%`) cannot be used here: the
+           * parent is a **flex item**, so its height comes from the flex
+           * layout rather than from a definite box, and a percentage
+           * height against an indefinite height falls back to `auto` —
+           * which would collapse the frame to a couple of lines.
+           *
+           * As a flex item of a flex column, the frame simply grows to
+           * fill the remaining space.
+           */
+          className="min-h-0 w-full flex-1 border-0"
+          // `allow-scripts` lets the learner's code run. `allow-same-origin`
+          // is deliberately **not** granted: with it, the frame would share
+          // this page's origin and could reach the app's DOM and storage.
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+    </div>
   );
 }

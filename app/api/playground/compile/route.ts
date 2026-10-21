@@ -1,6 +1,8 @@
 import { transform } from "sucrase";
 
+import { highlightTsx } from "@/lib/playground/highlight";
 import { compilePreviewStyles } from "@/lib/playground/styles";
+import { checkPracticeFile, type TypeDiagnostic } from "@/lib/playground/typecheck";
 
 /**
  * Compiles a learner's TSX source into browser-runnable JavaScript.
@@ -28,6 +30,10 @@ export type CompileResponse = {
   code?: string;
   /** Tailwind CSS generated from the current source. */
   css?: string;
+  /** The highlighted source, as HTML. */
+  html?: string;
+  /** TypeScript errors found in the current source. */
+  diagnostics?: TypeDiagnostic[];
   /** A human-readable error message. */
   error?: string;
   /** The stack of the error, when there is one. */
@@ -134,11 +140,15 @@ export async function POST(request: Request): Promise<Response> {
         ? appendTargetExport(code, wanted)
         : code;
     const css = await compilePreviewStyles(source);
+    const html = highlightTsx(source);
+    const typeCheck = await checkPracticeFile(fileName, source);
 
     return Response.json({
       ok: true,
       code: finalCode,
       css,
+      html,
+      diagnostics: typeCheck.diagnostics,
     } satisfies CompileResponse);
   } catch (error) {
     const err = error as Error;
