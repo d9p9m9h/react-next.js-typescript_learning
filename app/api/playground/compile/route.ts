@@ -1,5 +1,7 @@
 import { transform } from "sucrase";
 
+import { compilePreviewStyles } from "@/lib/playground/styles";
+
 /**
  * Compiles a learner's TSX source into browser-runnable JavaScript.
  *
@@ -24,6 +26,8 @@ export type CompileResponse = {
   ok: boolean;
   /** The compiled JavaScript, ready to be evaluated. */
   code?: string;
+  /** Tailwind CSS generated from the current source. */
+  css?: string;
   /** A human-readable error message. */
   error?: string;
   /** The stack of the error, when there is one. */
@@ -129,8 +133,13 @@ export async function POST(request: Request): Promise<Response> {
       wanted !== "default" && !exportsComponent(source, wanted)
         ? appendTargetExport(code, wanted)
         : code;
+    const css = await compilePreviewStyles(source);
 
-    return Response.json({ ok: true, code: finalCode } satisfies CompileResponse);
+    return Response.json({
+      ok: true,
+      code: finalCode,
+      css,
+    } satisfies CompileResponse);
   } catch (error) {
     const err = error as Error;
     return Response.json(

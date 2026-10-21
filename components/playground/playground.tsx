@@ -50,6 +50,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
   );
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
   const [compiledCode, setCompiledCode] = useState<string | null>(null);
+  const [compiledCss, setCompiledCss] = useState<string | null>(null);
   /**
    * Which panel is on screen.
    *
@@ -107,25 +108,29 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
         const result = (await response.json()) as {
           ok: boolean;
           code?: string;
+          css?: string;
           error?: string;
         };
 
         if (id !== requestIdRef.current) return;
 
-        if (!result.ok || !result.code) {
+        if (!result.ok || !result.code || !result.css) {
           setStatus("error");
           setCompileError(result.error ?? "Compile မအောင်မြင်ပါ။");
           setCompiledCode(null);
+          setCompiledCss(null);
           return;
         }
 
         setCompiledCode(result.code);
+        setCompiledCss(result.css);
         setStatus("ok");
       } catch {
         if (id !== requestIdRef.current) return;
         setStatus("error");
         setCompileError("Compile API ကို မေးနိုင်ခဲ့ပါ။ Server ကို စစ်ပါ။");
         setCompiledCode(null);
+        setCompiledCss(null);
       }
     },
     [componentName],
@@ -147,6 +152,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
   useEffect(() => {
     if (!hasNoComponent) return;
     setCompiledCode(null);
+    setCompiledCss(null);
     setStatus("idle");
   }, [hasNoComponent]);
 
@@ -416,6 +422,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
                 <PlaygroundErrorBoundary>
                   <PlaygroundPreview
                     code={compiledCode}
+                    css={compiledCss}
                     component={componentName}
                     props={props}
                     theme={resolvedTheme}

@@ -53,6 +53,8 @@ export type SandboxRenderRequest = {
   type: "render";
   /** The compiled CommonJS module. */
   code: string;
+  /** Tailwind stylesheet generated for this source. */
+  css: string;
   /** The component to pick out of the module. */
   component: string;
   /** Props for the component, in the serialisable format above. */

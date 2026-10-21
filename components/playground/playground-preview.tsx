@@ -32,6 +32,8 @@ type PlaygroundPreviewProps = {
    * left empty instead of showing a spurious "no component" error.
    */
   code: string | null;
+  /** Tailwind stylesheet generated for the compiled source. */
+  css: string | null;
   /** The component to pick out of the module. */
   component: string;
   /** Props for the component, in their raw (React) form. */
@@ -69,6 +71,7 @@ type PlaygroundPreviewProps = {
  */
 export function PlaygroundPreview({
   code,
+  css,
   component,
   props,
   theme,
@@ -179,7 +182,7 @@ export function PlaygroundPreview({
 
     // Nothing has been compiled yet — the preview stays empty rather than
     // reporting a confusing "no component" error.
-    if (code === null) {
+    if (code === null || css === null) {
       post({ token, type: "clear" });
       return;
     }
@@ -203,10 +206,11 @@ export function PlaygroundPreview({
       token,
       type: "render",
       code,
+      css,
       component,
       props: payload,
     });
-  }, [ready, token, code, component, post, onError]);
+  }, [ready, token, code, css, component, post, onError]);
 
   // Keep the preview's colour scheme in sync with the app.
   useEffect(() => {

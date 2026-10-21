@@ -76,6 +76,9 @@ const vendor: VendorBundle = rawVendor;
 
 const React = vendor.React;
 const ReactDOMClient = vendor.ReactDOMClient;
+const previewStyles = document.createElement("style");
+previewStyles.nonce = config.nonce;
+document.head.appendChild(previewStyles);
 
 /* -------------------------------------------------------------------------- */
 /* Messaging                                                                  */
@@ -341,6 +344,7 @@ function unmount(): void {
 function clearPreview(): void {
   unmount();
   if (container) container.innerHTML = "";
+  previewStyles.textContent = "";
   post({ token: config.token, type: "cleared" });
 }
 
@@ -410,6 +414,8 @@ function applyTheme(theme: "light" | "dark"): void {
 function handleRequest(request: SandboxRequest): void {
   switch (request.type) {
     case "render": {
+      previewStyles.textContent = request.css;
+
       let exports: Record<string, unknown>;
 
       try {

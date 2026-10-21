@@ -14,6 +14,7 @@
 | Date       | Change                                                                                                                                                                     |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-10-21 | **STEP 5** — practice files moved from the project root into `practice/`; the editor and the preview now take turns via a **Code / Preview** switch (one panel at a time). |
+| 2026-10-22 | Preview styles are compiled from the current TSX source with Tailwind CSS v4 and injected into the sandboxed iframe. |
 
 ---
 
@@ -116,7 +117,7 @@ The `dev` script is deliberately `next dev -H 127.0.0.1`. Verified with
 | ---------------------------- | ------- | -------------------------------------------------- |
 | `/`                          | Static  | The playground. The only page.                     |
 | `/_not-found`                | Static  | 404 page.                                          |
-| `/api/playground/compile`    | Dynamic | `POST` — compiles TSX → CommonJS (Sucrase, server) |
+| `/api/playground/compile`    | Dynamic | `POST` — compiles TSX → CommonJS and source-specific Tailwind CSS |
 | `/playground/sandbox`        | Dynamic | `GET` — the sandbox document (HTML + CSP)          |
 | `/playground/sandbox/vendor` | Dynamic | `GET` — the React runtime bundle for the sandbox   |
 
@@ -156,6 +157,8 @@ RootLayout (app/layout.tsx) — server
 ```
 
 The learner's code is **never** evaluated in the main application window.
+The compile route also returns CSS for the current source; the preview sends it to the iframe
+alongside the compiled module.
 
 ---
 
@@ -233,6 +236,11 @@ transform(source, {
 
 The `imports` transform turns `export default Foo` into `exports.default = Foo`.
 
+The iframe is a separate document and cannot inherit the app's stylesheet. Before returning, the
+route scans the current TSX for Tailwind candidates and compiles those utilities with the app's
+global theme. This happens for every compile, so classes added in the editor work without saving
+the file first.
+
 **Components that are declared but never exported.** A component like `UserList` in `P2L4.tsx` is
 only a local binding after compilation, so the sandbox could not reach it on `exports`. The compile
 route therefore appends one line when the file does not already export that name:
@@ -255,6 +263,9 @@ code cannot break out of the document.
 A small `require` shim resolves `react`, `react-dom`, `react-dom/client` and `react/jsx-runtime`.
 Any other import throws a clear error. React's hooks are additionally injected as bare globals so a
 file works even without an `import` line.
+
+The generated stylesheet travels with each render request and is applied through a nonce-bearing
+`<style>` element in the iframe. Clearing the preview also clears these styles.
 
 ### 5.3 Render
 
@@ -376,7 +387,7 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | `app/page.tsx`                           | 18    | Renders `<Playground />` and nothing else    |
 | `app/not-found.tsx`                      | 20    | 404 page                                     |
 | `app/globals.css`                        | 134   | Tailwind v4 import, design tokens, utilities |
-| `app/api/playground/compile/route.ts`    | 127   | Server-side TSX → CommonJS compile           |
+| `app/api/playground/compile/route.ts`    | 135   | Server-side TSX + Tailwind CSS compile       |
 | `app/playground/sandbox/route.ts`        | 188   | The sandbox document + CSP                   |
 | `app/playground/sandbox/vendor/route.ts` | 20    | The React runtime bundle                     |
 
@@ -389,10 +400,10 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | `components/theme-provider.tsx`                       | 84    | Theme state             |
 | `components/theme-toggle.tsx`                         | 54    | Theme switch            |
 | `components/storage-cleanup.tsx`                      | 17    | Obsolete-key cleanup    |
-| `components/playground/playground.tsx`                | 417   | The workspace           |
+| `components/playground/playground.tsx`                | 424   | The workspace           |
 | `components/playground/playground-view-toggle.tsx`    | 58    | Code / Preview switch   |
 | `components/playground/playground-editor.tsx`         | 153   | Editor + Reset          |
-| `components/playground/playground-preview.tsx`        | 221   | Iframe + message bridge |
+| `components/playground/playground-preview.tsx`        | 225   | Iframe + message bridge |
 | `components/playground/playground-console.tsx`        | 75    | Console panel           |
 | `components/playground/playground-error-boundary.tsx` | 61    | Error boundary          |
 
@@ -403,10 +414,11 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | `lib/storage.ts`                    | 25    | Deletes the obsolete progress key              |
 | `lib/playground/files.ts`           | 49    | Discovers the `practice/*.tsx` files           |
 | `lib/playground/registry.tsx`       | 80    | File → component + props mapping               |
-| `lib/playground/protocol.ts`        | 164   | Message types, token, message validation       |
+| `lib/playground/protocol.ts`        | 166   | Message types, token, message validation       |
 | `lib/playground/props.ts`           | 127   | React props → serialisable form                |
+| `lib/playground/styles.ts`          | 29    | Generates Tailwind CSS for the active TSX source |
 | `lib/playground/vendor.ts`          | 189   | Builds the React runtime bundle for the iframe |
-| `lib/playground/sandbox-runtime.ts` | 378   | Runs inside the iframe                         |
+| `lib/playground/sandbox-runtime.ts` | 383   | Runs inside the iframe                         |
 
 ### 8.4 Practice files (never modified by the app)
 
@@ -420,8 +432,8 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 
 ### 8.6 Dependencies
 
-**Runtime:** `next` `react` `react-dom` `sucrase` `tailwindcss` `typescript`
-**Dev:** `@tailwindcss/postcss` `postcss` `@types/node` `@types/react` `@types/react-dom`
+**Runtime:** `next` `react` `react-dom` `sucrase` `tailwindcss` `typescript` `@tailwindcss/postcss` `@tailwindcss/oxide` `postcss`
+**Dev:** `@types/node` `@types/react` `@types/react-dom`
 
 Every one of these is used. `prism-react-renderer` was removed together with the lesson code pane.
 
@@ -541,6 +553,11 @@ All results below were **actually run and observed** on 2026-10-21.
 | ------------------- | ----------------------------------------------------------------------- |
 | `npm run typecheck` | **Exit code 0** — no errors (run with a cleared `tsconfig.tsbuildinfo`) |
 | `npx next build`    | **Exit code 0** — compiled successfully, no warnings, 6 pages generated |
+
+**Follow-up on 2026-10-22:** `npm run typecheck` passed, and a Tailwind generation check against
+`practice/p2l8.tsx` confirmed its light/dark utilities plus new unsaved utilities produce CSS.
+The production build could not be re-verified in this sandbox: Turbopack's CSS worker exited before
+the build process could connect to it.
 
 Build output route table:
 
