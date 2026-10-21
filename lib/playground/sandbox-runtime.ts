@@ -11,9 +11,10 @@
  *   only allowed import is `import type` (which is erased at compile time).
  * - It must not contain the literal `</script>` — it is inlined into an
  *   HTML document.
- * - It must never touch the parent application. The iframe is sandboxed
- *   without `allow-same-origin`, so `window.parent` is an opaque origin
- *   that cannot be read; the only channel is `postMessage`.
+ * - It must only reach the parent application through `postMessage`. The
+ *   iframe is sandboxed without `allow-same-origin`, so the parent's
+ *   DOM and storage are unreadable from here; the only channel across the
+ *   boundary is `postMessage`, and every message carries the shared token.
  *
  * The React runtime is provided by the vendor bundle that is loaded before
  * this script (see `lib/playground/vendor.ts`).

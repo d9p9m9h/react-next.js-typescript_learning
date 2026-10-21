@@ -1,656 +1,165 @@
 # Detail Progress Summary
 
-**Project:** `react-next` — React Learning Lab
+**Project:** `react-next` — React Code Playground
 **Repository:** https://github.com/d9p9m9h/react-next.js-typescript_learning
 **Path:** `C:\__d9p__\react-next`
 **Stack:** Next.js 16.4.2 (App Router, Turbopack) · React 19.3 · TypeScript 7.0.2 · Tailwind CSS v4
+**Purpose:** A **localhost-only** React/TypeScript code playground. The learner edits `.tsx` practice files and sees the result render live.
 **Date:** 2026-10-21
-**Author of this summary:** AI assistant (GitHub Copilot) — working alongside the learner
 
 ---
 
 ## Table of Contents
 
-1. [Executive Summary](#1-executive-summary)
-2. [Session Timeline](#2-session-timeline)
-3. [Phase 1 — Emergency Repair](#3-phase-1--emergency-repair)
-4. [Phase 2 — ESLint Discussion](#4-phase-2--eslint-discussion)
-5. [Phase 3 — UI Redesign](#5-phase-3--ui-redesign)
-6. [Phase 4 — Syntax Theme Customization](#6-phase-4--syntax-theme-customization)
-7. [Phase 5 — Live Playground](#7-phase-5--live-playground)
-8. [Final Architecture](#8-final-architecture)
-9. [Complete File Inventory](#9-complete-file-inventory)
-10. [Bugs Found and Fixed](#10-bugs-found-and-fixed)
-11. [Key Concepts Learned](#11-key-concepts-learned)
-12. [Verification Results](#12-verification-results)
-13. [Remaining Known Issues](#13-remaining-known-issues)
-14. [Next Steps](#14-next-steps)
+1. [What this project is now](#1-what-this-project-is-now)
+2. [Getting started](#2-getting-started)
+3. [Final architecture](#3-final-architecture)
+4. [How the source files are discovered](#4-how-the-source-files-are-discovered)
+5. [The compile → preview flow](#5-the-compile--preview-flow)
+6. [The sandbox and its real security limits](#6-the-sandbox-and-its-real-security-limits)
+7. [Component reference](#7-component-reference)
+8. [Complete file inventory](#8-complete-file-inventory)
+9. [Theme system](#9-theme-system)
+10. [Styling and layout](#10-styling-and-layout)
+11. [Verification results](#11-verification-results)
+12. [Remaining known limitations](#12-remaining-known-limitations)
+13. [Appendix A — Command reference](#appendix-a--command-reference)
+14. [Appendix B — Message protocol](#appendix-b--message-protocol)
+15. [Appendix C — Glossary](#appendix-c--glossary)
 
 ---
 
-## 1. Executive Summary
+## 1. What this project is now
 
-This session transformed a **broken** Next.js learning workspace into a **fully functional, redesigned learning platform**.
+This is a **single-purpose code playground**, not a course platform.
 
-### What was broken
+Earlier versions of this repository carried a full lesson system: a lesson grid on the home page,
+seven dynamically-generated lesson routes under `/lesson/[slug]`, a learning-path sidebar, a
+progress bar, a visited/completed counter, a daily streak, and a Prism-based syntax-highlighted
+code pane. **All of that has been removed.** The application is now one screen:
 
-The project could not even compile. `app/layout.tsx` contained 19 TypeScript errors caused by **terminal output accidentally pasted into the source file** — lines prefixed with `[10/21/2026 12:01 AM] Đepar:` were injected in four separate places, corrupting JSX syntax and breaking the entire import graph.
+```
+┌──────────────────────────────────────────────────────────┐
+│ R  React Code Playground                    ☀   ☾   ⌘    │  header + theme switch
+├──────────────────────────────────────────────────────────┤
+│ [P2L3] [P2L4] [index] [p2l5] [p2l6] [p2l7] [index] …    │  file selector
+├───────────────────────────┬──────────────────────────────┤
+│ Source · ရေးမယ့် code      │ Preview · ရလဒ်               │
+│ ┌───────────────────────┐ │ ┌──────────────────────────┐ │
+│ │ P2L3.tsx  ● Compiled  │ │ │ ● Rendered result  [live]│ │
+│ │ [Reset]               │ │ ├──────────────────────────┤ │
+│ │                       │ │ │                          │ │
+│ │   (textarea)          │ │ │  (sandboxed iframe)     │ │
+│ │                       │ │ │                          │ │
+│ └───────────────────────┘ │ └──────────────────────────┘ │
+├───────────────────────────┴──────────────────────────────┤
+│ Console                                          [Clear]  │
+└──────────────────────────────────────────────────────────┘
+```
 
-### What was built
+The eight root-level `.tsx` files are the **practice content**. They are never modified by the
+app — the playground reads them, shows them in the editor, and renders them in the preview.
 
-| Area              | Before                                  | After                                                            |
-| ----------------- | --------------------------------------- | ---------------------------------------------------------------- |
-| Compilation       | 19 TS errors, build failed              | ✅ 0 errors, build passes                                        |
-| Tailwind CSS      | Not configured, CSS would not compile   | ✅ Full v4 setup (PostCSS plugin + `globals.css`)                |
-| Routing           | Single page, no navigation              | ✅ 7 statically-generated lesson routes + 404                    |
-| Code display      | None                                    | ✅ Syntax-highlighted code pane with a custom Emerald/Gold theme |
-| Live preview      | None                                    | ✅ Interactive demo panel per lesson                             |
-| Theming           | Light only, hardcoded colors            | ✅ Light / Dark / System with FOUC-free boot script              |
-| Progress tracking | None                                    | ✅ Lesson completion + daily streak, persisted to `localStorage` |
-| Typography        | System fonts only                       | ✅ Inter + JetBrains Mono + Noto Sans Myanmar via `next/font`    |
-| Mobile support    | Fixed-width layout, horizontal overflow | ✅ Fully responsive, zero overflow                               |
-| Home page         | Redirect to the first lesson            | ✅ Landing page with a live playground                          |
-| Playground        | None                                    | ✅ 8 auto-discovered `.tsx` files, edited and previewed live    |
-
-### Key metrics
-
-- **Files created:** 23
-- **Files modified:** 8
-- **Files deleted:** 1
-- **Bugs found and fixed:** 13 distinct issues
-- **Lines of code written:** ~2,800
-- **Build status:** ✅ Compiles successfully, 11 routes prerendered as static HTML
+| Concern        | How it is handled now                                               |
+| -------------- | ------------------------------------------------------------------- |
+| File selection | A `tablist` of every root-level `.tsx` file, keyboard-navigable     |
+| Editing        | A plain `<textarea>`; changes are debounced 400 ms, then compiled   |
+| Preview        | A sandboxed iframe running the compiled module                      |
+| Console        | `console.*` calls are forwarded from the iframe and shown here      |
+| Errors         | Compile errors and runtime errors are shown inline over the preview |
+| Reset          | Restores the selected file's original on-disk content               |
+| Theming        | Light / Dark / System, persisted in `localStorage`                  |
 
 ---
 
-## 2. Session Timeline
+## 2. Getting started
 
-| #   | Phase                              | Outcome                                                                       |
-| --- | ---------------------------------- | ----------------------------------------------------------------------------- |
-| 1   | Analyze project, fix `layout.tsx`  | Removed 4 paste artifacts, repaired 1 truncated JSX closer, fixed `</html >`  |
-| 2   | Create missing infrastructure      | `app/globals.css`, `postcss.config.mjs`, installed Tailwind PostCSS plugin    |
-| 3   | Restore functionality              | `app/page.jsx` re-enabled `CourseCard` import                                 |
-| 4   | ESLint discussion                  | Explained why ESLint is optional; user chose to skip it (focusing on lessons) |
-| 5   | UI Redesign — "Grill Me" interview | 3 rounds of questions, 16 decisions locked in                                 |
-| 6   | Implement redesign                 | 14 new files, 2 new routes, theme system, progress tracking                   |
-| 7   | Debug                              | Fixed 3 bugs (overflow, progress reset, streak date)                          |
-| 8   | Custom syntax theme                | Replaced `themes.oneDark` with a hand-built Emerald/Gold Prism theme          |
-| 9   | Final verification                 | Typecheck + build clean, all routes prerendered                               |
-| 10  | Playground — "Grill Me" interview  | 6 decisions locked in (auto-discovery, live mode, inline errors, …)            |
-| 11  | Implement playground               | 7 new files, Turbopack `?raw` rule, server-side Sucrase compile              |
-| 12  | Debug the playground               | Fixed 4 bugs (infinite render, stale module, console loop, missing exports)   |
-| 13  | Final verification                 | 8/8 files render, typecheck + build clean, production build verified         |
-
----
-
-## 3. Phase 1 — Emergency Repair
-
-### 3.1 Root cause: terminal output pasted into source
-
-Four lines in `app/layout.tsx` had the form:
-
-```
-[10/21/2026 12:01 AM] Đepar: <actual code>
-```
-
-This is the signature of copying from a VS Code terminal — the timestamp and the prompt (`Đepar:`) come along for the ride.
-
-| Line | Corrupted content                                               | Damage                                                        |
-| ---- | --------------------------------------------------------------- | ------------------------------------------------------------- |
-| 1    | `[10 / 21 / 2026 12:01 AM] Đepar: import type { Metadata } ...` | Broke the entire import graph → `Cannot find module 'next'`   |
-| 106  | `[10/21/2026 12:01 AM] Đepar: <h1 ...>`                         | Text node injected before the `<h1>` element                  |
-| 189  | `[10/21/2026 12:01 AM] Đepar: >`                                | Truncated the `<p>` closing bracket → 12 cascading JSX errors |
-| 271  | `[10/21/2026 12:01 AM] Đepar: <div ...>`                        | Text node injected before the `<div>` element                 |
-
-**Lesson for the learner:** when copying from a terminal, copy only from inside a code fence, or strip the prompt prefix before pasting.
-
-### 3.2 Error cascade
-
-A single broken `>` on line 189 produced 19 reported errors, because the JSX parser could no longer match closing tags:
-
-```
-TS1005  ',' expected            (×4, from the broken import)
-TS1121  Octal literals are not allowed   (from "10 / 21 / 2026" parsed as a number)
-TS1003  Identifier expected
-TS1382  Unexpected token. Did you mean `{'>'}` or `&gt;`?
-TS17002 Expected corresponding JSX closing tag for 'div' / 'li' / 'ol' / 'aside' / 'body' / 'html'  (×6)
-TS1109  Expression expected
-```
-
-### 3.3 Repairs applied
-
-```tsx
-// filepath: app/layout.tsx
-import type { Metadata } from "next"; // ← prefix removed
-import type { ReactNode } from "react";
-import "./globals.css";
-```
-
-```tsx
-// filepath: app/layout.tsx
-// The <p> element whose closing bracket was eaten by the paste artifact:
-<p
-  className={[
-    "text-sm font-bold",
-    lesson.active ? "text-violet-800" : "text-slate-700",
-  ].join(" ")}
->
-  {" "}
-  // ← restored
-  {lesson.title}
-</p>
-```
-
-Also corrected `</html >` → `</html>` (trailing space inside the tag).
-
-### 3.4 Missing Tailwind infrastructure
-
-The layout imported `"./globals.css"` — **but that file did not exist**, and there was no `postcss.config.mjs`. Tailwind classes like `bg-violet-600` and `backdrop-blur-xl` would have silently done nothing.
-
-**Created `app/globals.css`:**
-
-```css
-@import "tailwindcss";
-```
-
-**Created `postcss.config.mjs`:**
-
-```js
-const config = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
-};
-
-export default config;
-```
-
-**Installed:**
+The dev server binds to **127.0.0.1 only** — it is not reachable from the network.
 
 ```bash
-npm install --save-dev @tailwindcss/postcss postcss
+npm install
+npm run dev          # → http://127.0.0.1:3000
 ```
 
-> Tailwind v4 requires no `tailwind.config.js` — theme configuration lives in CSS via `@theme`.
+Other commands:
 
-### 3.5 Restoring the preview
-
-`app/page.jsx` had the `CourseCard` import commented out, leaving the "Browser Preview" panel empty:
-
-```jsx
-// filepath: app/page.jsx
-import CourseCard from "../p2l7";
-
-export default function HomePage() {
-  return (
-    <main
-      style={{
-        flexDirection: "row",
-        margin: "auto",
-        maxWidth: "180px",
-        padding: "20px",
-      }}
-    >
-      <CourseCard
-        title="Mingalarpar"
-        durationMinutes={60}
-        instructor="Deparminhtet"
-      />
-    </main>
-  );
-}
+```bash
+npm run typecheck    # tsc -b
+npx next build       # production build
+npx next start       # serve the production build
 ```
 
-### 3.6 Git hygiene
+> On Windows, if `npm` is not on your `PATH`, use `npm.cmd` / `npx.cmd`.
 
-Added to `.gitignore`:
-
-```gitignore
-node_modules
-.next
-*.tsbuildinfo
-AGENTS.md
-```
-
-`AGENTS.md` is auto-generated by `next dev` on every run and would otherwise appear as untracked noise.
+The `dev` script is deliberately `next dev -H 127.0.0.1`. Verified with
+`Get-NetTCPConnection -LocalPort 3000 -State Listen` → the socket listens on `127.0.0.1`
+**only** (not `0.0.0.0`).
 
 ---
 
-## 4. Phase 2 — ESLint Discussion
+## 3. Final architecture
 
-### 4.1 The actual finding
+### 3.1 Route table
 
-The `npx next lint` command failed with:
+| Route                        | Type    | Purpose                                            |
+| ---------------------------- | ------- | -------------------------------------------------- |
+| `/`                          | Static  | The playground. The only page.                     |
+| `/_not-found`                | Static  | 404 page.                                          |
+| `/api/playground/compile`    | Dynamic | `POST` — compiles TSX → CommonJS (Sucrase, server) |
+| `/playground/sandbox`        | Dynamic | `GET` — the sandbox document (HTML + CSP)          |
+| `/playground/sandbox/vendor` | Dynamic | `GET` — the React runtime bundle for the sandbox   |
+
+There are **no lesson routes**. `/lesson/*` returns **404** (verified).
+
+### 3.2 Component tree
 
 ```
-Invalid project directory provided, no such directory: C:\__d9p__\react-next\lint
+RootLayout (app/layout.tsx) — server
+└── ThemeProvider                       ← theme state + localStorage
+    └── StorageCleanup                  ← deletes the obsolete progress key
+        └── LabShell (client)
+            ├── LabHeader (client)
+            │   └── ThemeToggle (client)
+            └── {children} = app/page.tsx
+                └── Playground (client)          components/playground/playground.tsx
+                    ├── file tablist
+                    ├── PlaygroundEditor         ← <textarea> + Reset + status
+                    ├── PlaygroundPreview        ← <iframe> + postMessage bridge
+                    │   └── (sandbox frame)      ← app/playground/sandbox
+                    ├── PlaygroundErrorBoundary  ← catches app-side render errors
+                    └── PlaygroundConsole        ← captured log lines
 ```
 
-**This is not a misconfiguration — it is a Next.js 16 breaking change.** From the shipped upgrade guide:
+### 3.3 The three processes involved
 
-> _"The `next lint` command has been removed. Use Biome or ESLint directly. `next build` no longer runs linting."_
-
-### 4.2 The mental model
-
-|                           | `tsc` (TypeScript)                  | ESLint                          |
-| ------------------------- | ----------------------------------- | ------------------------------- |
-| Checks                    | Type safety                         | Code style & patterns           |
-| Unused variables          | Only if `noUnusedLocals` is enabled | ✅ Always                       |
-| Hook rules                | ❌                                  | ✅ `react-hooks/rules-of-hooks` |
-| Missing `key` in `.map()` | ❌                                  | ✅ `react/jsx-key`              |
-| Accessibility             | ❌                                  | ✅ `jsx-a11y`                   |
-| Next.js conventions       | ❌                                  | ✅ `@next/eslint-plugin-next`   |
-
-### 4.3 Real examples found in this project
-
-**`P2L3.tsx` — component invoked at module level:**
-
-```tsx
-export default SearchBox(); // ❌ runs useState outside a component → "Invalid hook call"
-export default SearchBox; // ✅ exports the component
+```
+ Browser tab (app)              Sandbox frame                Server
+┌────────────────────┐        ┌──────────────────┐        ┌──────────┐
+│ Playground         │        │ sandbox-runtime  │        │ /api/    │
+│  ├ editor state    │        │  ├ evaluate      │        │ compile  │
+│  └ PlaygroundPreview│ ─────► │  ├ render        │ ◄───── │ (Sucrase)│
+│                    │ postMsg│  └ console proxy │  code  │          │
+│  console entries ◄─┼────────┤                  │        └──────────┘
+└────────────────────┘        └──────────────────┘
 ```
 
-`tsc` cannot catch this (calling a function is a valid expression). ESLint's `react-hooks/rules-of-hooks` rule catches it immediately.
-
-**`explicit_syntax.tsx` — unused destructured setters:**
-
-```tsx
-const [item, setItem] = useState<string[]>([]); // ❌ both unused
-const [theme, setTheme] = useState<selectedTheme>("light"); // ❌ both unused
-```
-
-### 4.4 Decision
-
-The learner chose to **skip ESLint** to stay focused on the learning material. The zero-dependency alternative was offered and accepted:
-
-```json
-// filepath: tsconfig.json
-{
-  "compilerOptions": {
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
-  }
-}
-```
-
-`noUnusedParameters` was already enabled in the project.
+The learner's code is **never** evaluated in the main application window.
 
 ---
 
-## 5. Phase 3 — UI Redesign
+## 4. How the source files are discovered
 
-### 5.1 "Grill Me" interview — decisions locked
-
-The learner asked to be interviewed before any code was written. Three rounds, sixteen decisions:
-
-| Question            | Decision                                       |
-| ------------------- | ---------------------------------------------- |
-| Design direction    | Purpose-driven: preview the code being learned |
-| Layout structure    | Keep the lab shell (sidebar + preview)         |
-| Color palette       | **Emerald + Gold** (dark theme)                |
-| Dark mode           | **Both + follow system**                       |
-| Scope               | `layout.tsx` + `app/page.jsx`                  |
-| Typography          | **Inter + JetBrains Mono** (next/font)         |
-| Preview panel       | **Code pane + live preview, side by side**     |
-| Sidebar behavior    | **Real routes** (App Router dynamic route)     |
-| Header content      | **Progress / streak / stats**                  |
-| Accent usage        | **Emerald = action, Gold = highlight**         |
-| Code pane content   | Highlighted snippet only (not full file)       |
-| Preview viewport    | Responsive                                     |
-| Syntax highlighting | `prism-react-renderer`                         |
-| Font loading        | `next/font` (self-hosted)                      |
-
-### 5.2 Design token system
-
-Rather than hardcoding Tailwind color classes everywhere, the redesign introduced **semantic CSS variables** that flip automatically with the theme.
-
-```css
-/* filepath: app/globals.css */
-:root {
-  --surface-base: oklch(0.985 0.004 160);
-  --surface-raised: oklch(1 0 0);
-  --surface-sunken: oklch(0.965 0.008 160);
-  --surface-border: oklch(0.9 0.012 160);
-  --surface-border-strong: oklch(0.85 0.015 160);
-  --text-strong: oklch(0.24 0.03 160);
-  --text-muted: oklch(0.52 0.02 160);
-  --text-subtle: oklch(0.65 0.015 160);
-  --accent: var(--color-emerald-600);
-  --accent-contrast: oklch(1 0 0);
-  --highlight: var(--color-gold-500);
-}
-
-.dark {
-  --surface-base: oklch(0.19 0.018 165);
-  --surface-raised: oklch(0.235 0.02 165);
-  --surface-sunken: oklch(0.155 0.016 165);
-  --surface-border: oklch(0.31 0.022 165);
-  --surface-border-strong: oklch(0.38 0.026 165);
-  --text-strong: oklch(0.96 0.008 160);
-  --text-muted: oklch(0.74 0.018 160);
-  --text-subtle: oklch(0.6 0.018 160);
-  --accent: var(--color-emerald-400);
-  --accent-contrast: oklch(0.16 0.02 165);
-  --highlight: var(--color-gold-400);
-}
-```
-
-Tailwind v4 `@theme` block redefines the emerald and gold ramps in **oklch** (perceptually uniform) and exposes them as `bg-emerald-600`, `text-gold-500`, etc.
-
-Custom `@utility` rules bridge Tailwind class names to the CSS variables:
-
-```css
-@utility surface-raised {
-  background-color: var(--surface-raised);
-}
-@utility accent-text {
-  color: var(--accent);
-}
-@utility highlight-bg {
-  background-color: var(--highlight);
-  color: oklch(0.16 0.02 165);
-}
-```
-
-### 5.3 Typography
-
-```tsx
-// filepath: app/layout.tsx
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono-code",
-  display: "swap",
-});
-const myanmar = Noto_Sans_Myanmar({
-  subsets: ["myanmar", "latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-myanmar",
-  display: "swap",
-});
-```
-
-`Noto Sans Myanmar` is required because the UI mixes Burmese explanatory text with English code identifiers.
-
-### 5.4 FOUC-free theme boot
-
-The theme is applied **before first paint** by an inline script in `<head>`, so the page never flashes the wrong color scheme:
-
-```tsx
-// filepath: app/layout.tsx
-const themeScript = `
-(function () {
-  try {
-    var stored = localStorage.getItem("react-lab-theme");
-    var theme = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
-    var dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.classList.toggle("dark", dark);
-  } catch (e) {}
-})();
-`;
-```
-
-The `<html>` element carries `suppressHydrationWarning` because the class is mutated outside React's control.
-
-### 5.5 Routing architecture
-
-```
-/                              → redirect to /lesson/jsx-rendering
-/lesson/[slug]                 → dynamic route, SSG
-  ├── jsx-rendering            ● (SSG)
-  ├── components               ● (SSG)
-  ├── props                    ● (SSG)
-  ├── state-events             ● (SSG)
-  ├── typescript               ● (SSG)
-  ├── react-next               ● (SSG)
-  └── event-handlers           ● (SSG)
-/_not-found                    → custom 404
-```
-
-```tsx
-// filepath: app/lesson/[slug]/page.tsx
-export function generateStaticParams() {
-  return getLessonSlugs().map((slug) => ({ slug }));
-}
-
-export const dynamicParams = false; // unknown slug → 404
-
-export default async function LessonPage({ params }: PageProps) {
-  const { slug } = await params; // ← params is a Promise in Next 16
-  const lesson = getLesson(slug);
-  if (!lesson) notFound();
-  return <LessonView lesson={lesson} />;
-}
-```
-
-### 5.6 The Server/Client boundary (most important architectural decision)
-
-`lib/lessons.ts` holds **data only** — no React imports — so it is safe to import from a Server Component:
+`lib/playground/files.ts` uses Turbopack's `import.meta.glob`:
 
 ```ts
-// filepath: lib/lessons.ts
-export type Lesson = {
-  slug: string;
-  number: string;
-  title: string;
-  detail: string;
-  concept: string;
-  file: string;
-  language: string;
-  code: string;
-  demoKey?: string; // ← string key, not a component reference
-};
+const rawSources = import.meta.glob("/*.tsx", {
+  query: "?raw",
+  eager: true,
+}) as Record<string, { default: string }>;
 ```
 
-Client-only demo components live in a separate file and are looked up by that key:
-
-```tsx
-// filepath: components/lesson-demos.tsx
-"use client";
-
-const demos: Record<string, ComponentType> = {
-  "course-card": CourseCardDemo,
-  "name-input": NameInput,
-  "profile-editor": ProfileEditor,
-  "search-box": SearchBox,
-};
-
-export function LessonDemo({ demoKey }: { demoKey: string }) {
-  const Demo = demos[demoKey];
-  if (!Demo) return null;
-  return <Demo />;
-}
-```
-
-**Why this matters:** if `lib/lessons.ts` imported `CourseCard` (a `"use client"` module) directly, the Server Component at `app/lesson/[slug]/page.tsx` would be pulling client code into a server module — an error Next.js explicitly forbids. The string key keeps the two worlds apart.
-
-### 5.7 Progress and streak tracking
-
-```tsx
-// filepath: components/progress-store.tsx
-const STORAGE_KEY = "react-lab-progress";
-
-export function ProgressProvider({ children }: { children: ReactNode }) {
-  const [completed, setCompleted] = useState<string[]>([]);
-  const [streak, setStreak] = useState(0);
-  const [lastVisit, setLastVisit] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-
-  // A ref mirrors state so markVisited always reads the latest values
-  // without needing them in its dependency list.
-  const stateRef = useRef({ completed, streak, lastVisit });
-  ...
-}
-```
-
-Progress is marked on lesson view, reflected as a ✓ badge in the sidebar, and shown as a percentage bar plus streak counter in the header.
-
----
-
-## 6. Phase 4 — Syntax Theme Customization
-
-### 6.1 The problem
-
-The first implementation used the built-in `themes.oneDark` from `prism-react-renderer`. In light mode the code pane still showed **dark-theme colors**:
-
-| Token              | Color                         | Readability in light mode |
-| ------------------ | ----------------------------- | ------------------------- |
-| `keyword`          | `rgb(198, 120, 221)` (purple) | Poor                      |
-| `function`         | `rgb(97, 175, 239)` (blue)    | Poor                      |
-| `string`           | `rgb(152, 195, 121)` (green)  | Acceptable                |
-| `maybe-class-name` | `rgb(209, 154, 102)` (orange) | Poor                      |
-
-Only the `plain` token had been remapped to `var(--text-strong)`; all colored tokens were hardcoded to the dark palette.
-
-### 6.2 The fix
-
-A fully custom Prism theme with two palettes, selected at runtime:
-
-```tsx
-// filepath: components/code-pane.tsx
-const LIGHT: Palette = {
-  plain: "#1f2937", // body text
-  comment: "#94a3b8", // muted gray, italic
-  keyword: "#047857", // Emerald — const, function, return
-  function: "#b45309", // Gold — function names
-  string: "#7c3aed", // Violet — string literals
-  number: "#0e7490", // Cyan — numbers, booleans
-  className: "#b45309", // Gold — types and classes
-  property: "#475569", // Slate — properties, parameters
-  punctuation: "#64748b",
-  operator: "#047857", // Emerald
-  tag: "#047857",
-  attrName: "#b45309",
-};
-
-const DARK: Palette = {
-  plain: "#e2e8f0",
-  comment: "#64748b",
-  keyword: "#34d399", // bright Emerald
-  function: "#fbbf24", // bright Gold
-  string: "#c4b5fd", // bright Violet
-  number: "#22d3ee", // bright Cyan
-  className: "#fbbf24",
-  property: "#cbd5e1",
-  punctuation: "#94a3b8",
-  operator: "#34d399",
-  tag: "#34d399",
-  attrName: "#fbbf24",
-};
-```
-
-### 6.3 Token mapping and ordering
-
-```tsx
-// filepath: components/code-pane.tsx
-function buildTheme(p: Palette): PrismTheme {
-  return {
-    plain: { color: p.plain },
-    styles: [
-      {
-        types: ["comment", "prolog", "cdata"],
-        style: { color: p.comment, fontStyle: "italic" },
-      },
-      { types: ["doctype", "punctuation"], style: { color: p.punctuation } },
-      {
-        types: ["property", "parameter", "symbol", "constant"],
-        style: { color: p.property },
-      },
-      { types: ["tag"], style: { color: p.tag } },
-      { types: ["boolean", "number"], style: { color: p.number } },
-      { types: ["operator", "entity", "url"], style: { color: p.operator } },
-      {
-        types: [
-          "selector",
-          "attr-name",
-          "string",
-          "char",
-          "builtin",
-          "inserted",
-        ],
-        style: { color: p.string },
-      },
-      { types: ["variable", "deleted"], style: { color: p.string } },
-      {
-        types: ["function", "method", "class-name"],
-        style: { color: p.function },
-      },
-      { types: ["keyword"], style: { color: p.keyword } }, // ← LAST = highest priority
-      { types: ["important", "attr-value"], style: { color: p.attrName } },
-    ],
-  };
-}
-```
-
-**Two non-obvious requirements:**
-
-1. **Both `plain` and `styles` keys are mandatory.** Returning only `styles` produces `TS2739: Type ... is missing the following properties from type 'PrismTheme': plain, styles`.
-2. **Order matters.** Prism applies the last matching entry, so `keyword` must come _after_ the generic `string` / `property` entries or it would be overridden.
-
-### 6.4 Theme reactivity
-
-```tsx
-// filepath: components/code-pane.tsx
-const { resolvedTheme } = useTheme();
-
-const theme = useMemo(
-  () => buildTheme(resolvedTheme === "dark" ? DARK : LIGHT),
-  [resolvedTheme],
-);
-```
-
-The code pane re-colors instantly when the user toggles the theme.
-
----
-
-## 7. Phase 5 — Live Playground
-
-### 7.1 What was requested
-
-The learner wanted a Home Page playground where the random `.tsx` files they
-had written could be opened, edited and previewed live. A "Grill Me" interview
-locked in six decisions before any code was written:
-
-| Question             | Decision                                                     |
-| -------------------- | ------------------------------------------------------------ |
-| File discovery       | **Auto-discover** — every root `.tsx` via `import.meta.glob`   |
-| Playground mode      | **Live** — edit the code and see the result immediately        |
-| Error handling       | **Inline** — the error shows in the preview panel itself      |
-| Missing exports      | **Side registry** — a separate file lists file → component    |
-| New dependency       | **Allowed** — a compiler package was approved                  |
-| Home page layout     | **Landing** — hero + playground + lesson grid                  |
-
-### 7.2 Architecture
-
-```
-app/page.tsx                              (Server Component — landing page)
-  └── Playground                          (Client)
-        ├── file tabs                     ← playgroundFiles (auto-discovered)
-        ├── PlaygroundEditor              (Client — <textarea>)
-        ├── PlaygroundErrorBoundary       (Client — class component)
-        └── PlaygroundConsole             (Client — captured console output)
-
-lib/playground/files.ts                   raw source of every root .tsx
-lib/playground/registry.tsx               file → component + props
-lib/playground/evaluate.ts                module evaluation in the browser
-app/api/playground/compile/route.ts       server-side TSX → JavaScript
-```
-
-### 7.3 How the source is discovered
-
-Turbopack's `import.meta.glob` is used with a `?raw` query so the *source
-text* of each file is imported instead of the compiled module:
-
-```ts
-const rawSources = import.meta.glob("/*.tsx", { query: "?raw", eager: true });
-```
-
-The `?raw` query needs a matching rule in `next.config.ts`, otherwise the
-`.tsx` files are compiled as React components:
+The `?raw` query asks Turbopack for the file **contents** instead of a module. That only works
+because `next.config.ts` adds a rule for it:
 
 ```ts
 turbopack: {
@@ -660,554 +169,457 @@ turbopack: {
 },
 ```
 
-Because the pattern is anchored at the project root, a new `.tsx` file in
-the root is picked up automatically — no registration needed.
+The pattern is anchored at the project root, so it picks up exactly the eight practice files and
+nothing else — `app/`, `components/` and `lib/` live in sub-directories.
 
-### 7.4 Where the compile happens
+> **Turbopack-only feature.** `import.meta.glob` does not work under webpack. This project builds
+> with Turbopack (`next dev` / `next build` in Next 16).
 
-Compiling in the browser would ship a compiler to every visitor. Instead the
-editor posts the source to a Route Handler, which runs **Sucrase** on the
-server and returns plain CommonJS:
+### 4.1 The registry — which component to render
+
+`lib/playground/registry.tsx` maps each file to the component that should be previewed and the
+props it needs. This is what lets the playground render a component that a file declares but never
+exports.
+
+| File                  | Component                 | Props                                    |
+| --------------------- | ------------------------- | ---------------------------------------- |
+| `P2L3.tsx`            | `default` (SearchBox)     | `{}`                                     |
+| `P2L4.tsx`            | `UserList`                | `{}`                                     |
+| `p2l5.tsx`            | `default` (ProfileEditor) | `{}`                                     |
+| `p2l6.tsx`            | `default` (NameInput)     | `{}`                                     |
+| `p2l7.tsx`            | `default` (CourseCard)    | `{ title, durationMinutes, instructor }` |
+| `index.tsx`           | `UserProfile`             | `{ name, age: <p>28</p>, isOnline }`     |
+| `explicit_syntax.tsx` | `ExplicitSyntaxDemo`      | `{}`                                     |
+| `event_handler.tsx`   | `"none"`                  | — (the file is entirely commented out)   |
+
+`"none"` means "there is nothing to render"; the playground shows a note instead of a preview.
+
+---
+
+## 5. The compile → preview flow
+
+### 5.1 Compile (server)
+
+`app/api/playground/compile/route.ts` runs Sucrase on the server so the browser never downloads a
+compiler:
 
 ```ts
 transform(source, {
   transforms: ["typescript", "jsx", "imports"],
   jsxRuntime: "automatic",
   production: true,
+  filePath: fileName,
 });
 ```
 
-The client then evaluates that module inside a `new Function` with a small
-`require` shim that only resolves `react`, `react-dom` and
-`react/jsx-runtime`. React's hooks are also injected as bare globals, so a
-learner can experiment without writing an import line first.
+The `imports` transform turns `export default Foo` into `exports.default = Foo`.
 
-### 7.5 Components that are not exported
+**Components that are declared but never exported.** A component like `UserList` in `P2L4.tsx` is
+only a local binding after compilation, so the sandbox could not reach it on `exports`. The compile
+route therefore appends one line when the file does not already export that name:
 
-Four practice files declare a component without exporting it (`index.tsx`,
-`P2L4.tsx`, `explicit_syntax.tsx`, `event_handler.tsx`). The learner's files
-are never modified. Instead:
+```js
+exports.__target = UserList;
+```
 
-- `lib/playground/registry.tsx` maps each file name to the component that
-  should be rendered, plus the props it needs.
-- When the wanted component is not exported, the module is evaluated a second
-  time with `exports.__target = <ComponentName>` appended.
+The sandbox's lookup order is: `__target` → the requested name → `default` → the only exported
+function.
 
-`event_handler.tsx` is entirely commented out, so it is registered with
-`component: "none"` and the preview explains that there is nothing to render.
+### 5.2 Evaluate (inside the iframe)
+
+`lib/playground/sandbox-runtime.ts` is compiled with Sucrase (TypeScript transform only) and
+inlined into the sandbox document. It evaluates the module by **injecting a `<script>` element**
+carrying the document's CSP nonce — not `new Function()`, because the policy does not allow
+`unsafe-eval`. The script body is set via `textContent`, so a `</script>` inside the learner's
+code cannot break out of the document.
+
+A small `require` shim resolves `react`, `react-dom`, `react-dom/client` and `react/jsx-runtime`.
+Any other import throws a clear error. React's hooks are additionally injected as bare globals so a
+file works even without an `import` line.
+
+### 5.3 Render
+
+`ReactDOMClient.createRoot` renders into the sandbox's `#root` element. `onUncaughtError` and
+`onRecoverableError` forward React's own errors back to the app as runtime errors.
+
+### 5.4 Props across the boundary
+
+React elements cannot be structured-cloned (they hold functions and symbols), so
+`lib/playground/props.ts` converts them into a serialisable description:
+
+```ts
+type PlaygroundElementSpec = {
+  __element: string; // e.g. "p"
+  props?: { [key: string]: PlaygroundPropValue };
+  children?: PlaygroundPropValue;
+};
+```
+
+The sandbox rebuilds them with `React.createElement`. A composite element (a component rather
+than an HTML tag) cannot be described this way and raises a clear error.
 
 ---
 
-## 8. Final Architecture
+## 6. The sandbox and its real security limits
 
-### 8.1 Component tree
+> **Read this section before claiming the sandbox is "secure".**
+> It is a _learning aid on a local machine_. It is **not** a security boundary for untrusted
+> internet users.
+
+### 6.1 What is genuinely enforced (all verified in a real browser)
+
+| Property                           | How                                                             | Verified result                                 |
+| ---------------------------------- | --------------------------------------------------------------- | ----------------------------------------------- |
+| Opaque origin                      | `<iframe sandbox="allow-scripts">` — **no** `allow-same-origin` | `window.origin === "null"`                      |
+| Cannot read the app's DOM          | Opaque origin                                                   | `SecurityError`                                 |
+| Cannot read the app's URL          | Opaque origin                                                   | `SecurityError`                                 |
+| Cannot read the app's storage      | Opaque origin                                                   | `SecurityError`                                 |
+| Cannot read cookies                | Opaque origin                                                   | `SecurityError`                                 |
+| Cannot use the network             | CSP `connect-src 'none'`                                        | `Failed to fetch` — blocked by CSP              |
+| Cannot use `eval()`                | CSP `script-src` has no `'unsafe-eval'`                         | `EvalError` when called from inside the sandbox |
+| Other frames cannot talk to it     | Every message must carry the random token                       | Wrong token → rejected, module not evaluated    |
+| The app only accepts its own frame | `event.source === iframe.contentWindow`                         | Checked on every message                        |
+
+The sandbox document's Content Security Policy, as served:
 
 ```
-app/layout.tsx                       (Server Component)
-  ├── <html className={inter.variable + mono.variable + myanmar.variable}>
-  │     └── <head> inline theme script (FOUC guard)
-  └── <body>
-        └── ThemeProvider            (Client)  light/dark/system
-              └── ProgressProvider   (Client)  completed[] / streak / lastVisit
-                    └── LabShell     (Client)  two-column grid
-                          ├── LabHeader    (Client)  progress bar · streak · theme toggle
-                          ├── LabSidebar   (Client)  7 lessons · ✓ badges · active state
-                          └── {children}
-                                └── LessonView  (Client)
-                                      ├── CodePane      (Client)  Prism highlight
-                                      └── LessonDemo    (Client)  live interactive demo
+default-src 'none';
+script-src 'nonce-<random>' 'strict-dynamic';
+style-src 'unsafe-inline';
+img-src data: blob:;
+font-src 'none';
+connect-src 'none';
+form-action 'none';
+base-uri 'none';
+frame-ancestors 'self'
 ```
 
-### 8.2 Data flow
+### 6.2 What is NOT enforced — real limitations
 
-```
-lib/lessons.ts  ──(Lesson type + demoKey string)──▶  app/lesson/[slug]/page.tsx
-        │                                                              │
-        │ (slug lookup)                                               ▼
-        └──────────────────────────────────────────────────▶  LessonView
-                                                                       │
-                                     ┌─────────────────────────────────┴──────────┐
-                                     ▼                                            ▼
-                              CodePane (code)                          LessonDemo (demoKey)
-                                     │                                            │
-                                     ▼                                            ▼
-                              Prism highlight                              demos[key]
-```
-
-### 8.3 Styling strategy
-
-| Concern              | Mechanism                                                        |
-| -------------------- | ---------------------------------------------------------------- |
-| Brand colors         | `@theme` block overriding Tailwind's emerald/gold ramps in oklch |
-| Theme-aware surfaces | CSS variables under `:root` / `.dark`                            |
-| Utility bridge       | `@utility` rules mapping class names to variables                |
-| Layout               | Tailwind utilities with `minmax(0,1fr)` grid tracks              |
-| Code colors          | Custom `PrismTheme` object, two palettes                         |
+1. **The learner can forge console and error messages.** The learner's code runs _in_ the frame
+   that holds the shared token, so it can read `window.__pbConfig.token` and post a message the app
+   will accept. **Verified:** code inside the sandbox successfully forged a `log` message that the
+   app rendered in its console panel. This is cosmetic spoofing — it cannot affect the app's state
+   — but the console output is therefore _not_ tamper-proof.
+2. **The token is not a privilege boundary.** It stops _other_ documents and frames from
+   interfering. It does not protect the app from the code it is protecting.
+3. **The compile API is open to anyone who can reach the server.** `POST /api/playground/compile`
+   accepts arbitrary source and runs Sucrase on it. It is a _transform_, not an execution, so this
+   is low risk — but the endpoint is unauthenticated. It is only reachable on 127.0.0.1 in practice.
+4. **The vendor bundle is served with a permissive CSP of its own.** The sandbox's strict CSP
+   applies to the sandbox document; the vendor route serves JavaScript with no CSP of its own.
+5. **Type errors are not reported.** The compile step is a Sucrase _transform_, not a type check.
+   A file with type errors compiles and runs; only syntax errors fail.
+6. **The practice files are compiled with `production: true`**, so React's development warnings are
+   absent from the compiled output even though the React _runtime_ is the development build.
 
 ---
 
-## 9. Complete File Inventory
+## 7. Component reference
 
-### Created (14 files)
+| File                                                  | Role                                                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `components/lab-shell.tsx`                            | App shell. Sticky header + a full-height `<main>` (`lg:min-h-0`) so the playground fills the viewport. |
+| `components/lab-header.tsx`                           | Compact header: "React Code Playground" + the theme switch.                                            |
+| `components/theme-toggle.tsx`                         | Light / Dark / System buttons with `aria-pressed`.                                                     |
+| `components/theme-provider.tsx`                       | Theme state, `localStorage` key `react-lab-theme`, follows the OS when set to `system`.                |
+| `components/storage-cleanup.tsx`                      | Deletes the orphaned `react-lab-progress` key once on mount.                                           |
+| `components/playground/playground.tsx`                | The workspace: file tabs, editor, preview, console; owns the compile debounce.                         |
+| `components/playground/playground-editor.tsx`         | `<textarea>` editor with Tab-insert, status label and Reset button.                                    |
+| `components/playground/playground-preview.tsx`        | The `<iframe>` and the `postMessage` bridge; validates the source and token.                           |
+| `components/playground/playground-console.tsx`        | Renders captured log lines.                                                                            |
+| `components/playground/playground-error-boundary.tsx` | Catches app-side render errors so a broken preview never takes down the page.                          |
 
-| File                            | Purpose                                                          |
-| ------------------------------- | ---------------------------------------------------------------- |
-| `app/globals.css`               | Design tokens, Tailwind import, utility layer, scrollbar styling |
-| `app/page.tsx`                  | Root redirect to the first lesson                                |
-| `app/not-found.tsx`             | Custom 404 page                                                  |
-| `app/lesson/[slug]/page.tsx`    | Dynamic route: SSG, metadata, 404 handling                       |
-| `components/lab-shell.tsx`      | App frame: header + sidebar/content grid                         |
-| `components/lab-header.tsx`     | Logo, progress bar, streak counter, theme toggle                 |
-| `components/lab-sidebar.tsx`    | Lesson navigation with completion checkmarks                     |
-| `components/lesson-view.tsx`    | Lesson header + code/preview split + reminders                   |
-| `components/code-pane.tsx`      | Syntax-highlighted code viewer with custom theme                 |
-| `components/lesson-demos.tsx`   | Client-only demo component registry                              |
-| `components/theme-provider.tsx` | Theme context, persistence, system-follow                        |
-| `components/theme-toggle.tsx`   | Theme switcher UI (compact and segmented variants)               |
-| `components/progress-store.tsx` | Progress + streak state, localStorage persistence                |
-| `lib/lessons.ts`                | Server-safe lesson registry (7 lessons)                          |
+### 7.1 Keyboard support
 
-### Created — Phase 5, Live Playground (7 files)
+The file list is a proper ARIA `tablist`:
 
-| File                                          | Purpose                                                     |
-| --------------------------------------------- | ----------------------------------------------------------- |
-| `next.config.ts`                              | Turbopack rule so `?raw` imports return file contents       |
-| `lib/playground/files.ts`                     | Auto-discovers the raw source of every root `.tsx` file     |
-| `lib/playground/registry.tsx`                 | Maps each file to the component to render, plus its props   |
-| `lib/playground/evaluate.ts`                  | Evaluates compiled modules in the browser                   |
-| `app/api/playground/compile/route.ts`         | Server-side TSX → JavaScript compile (Sucrase)              |
-| `components/playground/playground.tsx`        | Playground shell: tabs, editor, preview, console            |
-| `components/playground/playground-editor.tsx`  | Editable source panel with Tab handling and status badge    |
-| `components/playground/playground-console.tsx` | Captured `console` output strip                             |
-| `components/playground/playground-error-boundary.tsx` | Catches render errors and shows them inline          |
+- `tabIndex` is a **roving** value — only the selected tab is `0`, the rest are `-1`.
+- `ArrowLeft` / `ArrowRight` move the selection and wrap around.
+- `Home` / `End` jump to the first / last file.
+- The focus moves with the selection.
 
-### Modified (6 files)
-
-| File              | Change                                                          |
-| ----------------- | --------------------------------------------------------------- |
-| `app/layout.tsx`  | Complete rewrite — fonts, theme script, providers, shell         |
-| `app/globals.css` | Replaced minimal version with full token system                  |
-| `package.json`    | Added `prism-react-renderer`, `@tailwindcss/postcss`, `postcss`  |
-| `tsconfig.json`   | Added `@/*` path alias                                           |
-| `.gitignore`      | Added `*.tsbuildinfo`, `AGENTS.md`                               |
-
-### Modified — Phase 5, Live Playground (3 files)
-
-| File                   | Change                                                                     |
-| ---------------------- | -------------------------------------------------------------------------- |
-| `app/page.tsx`         | Redirect replaced with a landing page: hero + playground + lesson grid      |
-| `components/lab-shell.tsx` | The sidebar is hidden on the home route so the landing page can go full width |
-| `package.json`         | Added `sucrase` (the server-side TSX compiler)                              |
-
-### Deleted (1 file)
-
-| File           | Reason                                |
-| -------------- | ------------------------------------- |
-| `app/page.jsx` | Replaced by `app/page.tsx` (redirect) |
-
-### Unchanged (lesson source files)
-
-`index.tsx` · `P2L3.tsx` · `P2L4.tsx` · `event_handler.tsx` · `explicit_syntax.tsx` · `p2l5.tsx` · `p2l6.tsx` · `p2l7.tsx`
-
-These are the learner's practice files. They were deliberately **not** modified — only consumed as live demos.
+Every interactive control has a visible focus ring
+(`focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]`).
+The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scroll container uses
+`focus-within:outline-2`, so the editor still shows a visible ring when focused.
 
 ---
 
-## 10. Bugs Found and Fixed
+## 8. Complete file inventory
 
-### Bug 1 — Terminal output in source file
+### 8.1 Application routes
 
-- **Symptom:** 19 TypeScript errors, build failure
-- **Cause:** Copied terminal output including timestamps and prompt into `app/layout.tsx`
-- **Fix:** Stripped 4 prefix lines, repaired 1 truncated JSX closing bracket, fixed `</html >`
-- **Lesson:** never paste raw terminal output; strip the prompt prefix
+| File                                     | Lines | Purpose                                      |
+| ---------------------------------------- | ----- | -------------------------------------------- |
+| `app/layout.tsx`                         | 73    | Root layout, fonts, metadata, theme boot     |
+| `app/page.tsx`                           | 18    | Renders `<Playground />` and nothing else    |
+| `app/not-found.tsx`                      | 20    | 404 page                                     |
+| `app/globals.css`                        | 134   | Tailwind v4 import, design tokens, utilities |
+| `app/api/playground/compile/route.ts`    | 127   | Server-side TSX → CommonJS compile           |
+| `app/playground/sandbox/route.ts`        | 188   | The sandbox document + CSP                   |
+| `app/playground/sandbox/vendor/route.ts` | 20    | The React runtime bundle                     |
 
-### Bug 2 — Missing Tailwind build pipeline
+### 8.2 Components
 
-- **Symptom:** Tailwind utility classes would have had no effect
-- **Cause:** No `globals.css`, no `postcss.config.mjs`, no `@tailwindcss/postcss`
-- **Fix:** Created both files, installed the plugin
-- **Lesson:** Tailwind v4 needs the PostCSS plugin; `tailwind.config.js` is no longer required
+| File                                                  | Lines | Purpose                 |
+| ----------------------------------------------------- | ----- | ----------------------- |
+| `components/lab-shell.tsx`                            | 21    | App shell               |
+| `components/lab-header.tsx`                           | 35    | Compact header          |
+| `components/theme-provider.tsx`                       | 84    | Theme state             |
+| `components/theme-toggle.tsx`                         | 54    | Theme switch            |
+| `components/storage-cleanup.tsx`                      | 17    | Obsolete-key cleanup    |
+| `components/playground/playground.tsx`                | 363   | The workspace           |
+| `components/playground/playground-editor.tsx`         | 133   | Editor + Reset          |
+| `components/playground/playground-preview.tsx`        | 209   | Iframe + message bridge |
+| `components/playground/playground-console.tsx`        | 75    | Console panel           |
+| `components/playground/playground-error-boundary.tsx` | 61    | Error boundary          |
 
-### Bug 3 — `baseUrl` removed in TypeScript 7
+### 8.3 Library
 
-- **Symptom:** `TS5102: Option 'baseUrl' has been removed`
-- **Cause:** TypeScript 7 dropped `baseUrl` support
-- **Fix:** Removed `baseUrl`, kept only `paths: { "@/*": ["./*"] }`
-- **Lesson:** in TS 7, `paths` alone is enough for aliases
+| File                                | Lines | Purpose                                        |
+| ----------------------------------- | ----- | ---------------------------------------------- |
+| `lib/storage.ts`                    | 25    | Deletes the obsolete progress key              |
+| `lib/playground/files.ts`           | 41    | Discovers the root-level `.tsx` files          |
+| `lib/playground/registry.tsx`       | 79    | File → component + props mapping               |
+| `lib/playground/protocol.ts`        | 164   | Message types, token, message validation       |
+| `lib/playground/props.ts`           | 127   | React props → serialisable form                |
+| `lib/playground/vendor.ts`          | 189   | Builds the React runtime bundle for the iframe |
+| `lib/playground/sandbox-runtime.ts` | 378   | Runs inside the iframe                         |
 
-### Bug 4 — Server Component importing a client component
+### 8.4 Practice files (never modified by the app)
 
-- **Symptom:** Would produce "You're importing a component that needs `useState`" errors
-- **Cause:** `lib/lessons.ts` originally stored component references
-- **Fix:** Split into `lib/lessons.ts` (data) and `components/lesson-demos.tsx` (demos), connected by a `demoKey` string
-- **Lesson:** keep the server/client boundary explicit and data-only
+`P2L3.tsx` · `P2L4.tsx` · `p2l5.tsx` · `p2l6.tsx` · `p2l7.tsx` · `index.tsx` ·
+`event_handler.tsx` · `explicit_syntax.tsx`
 
-### Bug 5 — Theme ignored the stored preference
+### 8.5 Configuration
 
-- **Symptom:** Setting `localStorage` to `"light"` still rendered dark
-- **Cause:** A `useEffect` that re-applied the "system" resolution on every mount, overwriting the stored value
-- **Fix:** Read the stored theme once on mount, apply it, and only follow the OS while the preference is `"system"`
-- **Lesson:** the effect that follows the OS must be conditional on the current preference
+`package.json` · `tsconfig.json` · `next.config.ts` · `postcss.config.mjs` · `next-env.d.ts`
 
-### Bug 6 — Mobile horizontal overflow
+### 8.6 Dependencies
 
-- **Symptom:** `scrollWidth 581px` vs `clientWidth 375px` on a 390px viewport
-- **Cause:** Grid and flex children default to `min-width: auto`, so a wide code block pushed the layout
-- **Fix:** `min-w-0` on every grid child plus `grid-cols-[minmax(0,1fr)]` on the grids themselves
-- **Lesson:** always set `min-w-0` on grid/flex children that contain long content
+**Runtime:** `next` `react` `react-dom` `sucrase` `tailwindcss` `typescript`
+**Dev:** `@tailwindcss/postcss` `postcss` `@types/node` `@types/react` `@types/react-dom`
 
-### Bug 7 — Progress reset on client-side navigation
-
-- **Symptom:** Visiting a second lesson kept the counter at `1/7`
-- **Cause:** A `useRef` guard (`marked.current`) prevented re-running, but React **reuses the component instance** across route changes, so the guard blocked legitimate updates
-- **Fix:** Removed the ref guard; depend on `lesson.slug` and made `markVisited` idempotent
-- **Lesson:** don't use instance-level refs as guards in routed layouts
-
-### Bug 8 — Streak date off by one day
-
-- **Symptom:** `lastVisit` was `2026-10-20` when the local date was `2026-10-21`
-- **Cause:** `toISOString()` returns **UTC**, which rolls back a day for users in UTC+ timezones
-- **Fix:** Build the date from `getFullYear()` / `getMonth()` / `getDate()`
-- **Lesson:** never use `toISOString()` for local calendar dates
-
-### Bug 9 — Double title in browser tab
-
-- **Symptom:** Tab read "02 · Components | React Learning Lab | React Learning Lab"
-- **Cause:** The lesson title already included the suffix, and the root layout also declared a `title.template`
-- **Fix:** Removed the suffix from `generateMetadata` and relied on the template
-- **Lesson:** when using `title.template`, child pages must not repeat the suffix
-
-### Bug 10 — Prism theme rejected by TypeScript
-
-- **Symptom:** `TS2739: ... is missing the following properties from type 'PrismTheme': plain, styles`
-- **Cause:** The theme override spread `oneDark` but overrode `styles` with a map that dropped the type shape
-- **Fix:** Return a full `PrismTheme` object with both `plain` and `styles` keys
-- **Lesson:** `PrismTheme` requires both keys
-
-### Bug 11 — "Too many re-renders" in the playground
-
-- **Symptom:** `Error: Too many re-renders` as soon as the playground mounted
-- **Cause:** The resolved component was stored with `setComponent(() => resolved)`. React reads a function argument as a *state updater*, so it called the component instead of storing it.
-- **Fix:** Store the component inside an object (`{ component, version }`) and bump a version number to force a re-render. The component itself is passed as a prop, never as the state value.
-- **Lesson:** never store a function in state directly — wrap it in an object
-
-### Bug 12 — Console capture caused an infinite update loop
-
-- **Symptom:** `Error: Maximum update depth exceeded` every time the learner typed
-- **Cause:** The console capture wrote to React state on every call. React's own development logging triggered the capture, which triggered a re-render, which logged again.
-- **Fix:** Buffer the entries in a ref and flush them on a 120 ms timer. Next.js' own `[Fast Refresh]` / `[HMR]` messages are passed through to the real console instead of being captured.
-- **Lesson:** never write to state from a `console` override — buffer and flush
-
-### Bug 13 — Components that were declared but never exported
-
-- **Symptom:** `UserList`, `UserProfile` and `ExplicitSyntaxDemo` produced an empty preview
-- **Cause:** The learner's practice files define the component but never `export` it, so the evaluated module had no binding to render.
-- **Fix:** The module is evaluated a second time with `exports.__target = <ComponentName>` appended. The learner's files are never modified.
-- **Lesson:** a module's exports are only what it explicitly exports
+Every one of these is used. `prism-react-renderer` was removed together with the lesson code pane.
 
 ---
 
-## 11. Key Concepts Learned
+## 9. Theme system
 
-### 11.1 Next.js 16 specifics
+`components/theme-provider.tsx` owns the theme. The three values are `light`, `dark` and `system`;
+`system` follows the OS preference through a `matchMedia` listener.
 
-| Concept                     | Detail                                                       |
-| --------------------------- | ------------------------------------------------------------ |
-| `next lint` removed         | Use ESLint or Biome directly; `next build` no longer lints   |
-| `params` is a Promise       | `const { slug } = await params` — no `await` = runtime error |
-| `generateStaticParams`      | Prerenders dynamic routes at build time                      |
-| `dynamicParams = false`     | Unknown params return 404 instead of rendering on demand     |
-| `generateMetadata`          | Per-route SEO; combine with `title.template`                 |
-| Server vs Client Components | `"use client"` is a boundary, not a file-type marker         |
-| `import.meta.glob`          | Turbopack-only; imports many modules by glob pattern         |
-| `?raw` query                | Needs a matching `turbopack.rules` entry (`type: "text"`)    |
-| Route Handlers              | `export async function POST(request: Request)`                |
+The theme is persisted under the `localStorage` key **`react-lab-theme`**.
 
-### 11.2 Tailwind CSS v4 specifics
+**FOUC-free boot.** `app/layout.tsx` inlines a small script in `<head>` that reads the stored
+theme and toggles the `.dark` class _before_ the first paint, so the page never flashes the wrong
+colour scheme.
 
-| Concept                 | Detail                                                      |
-| ----------------------- | ----------------------------------------------------------- |
-| No `tailwind.config.js` | Configuration moved into CSS via `@theme`                   |
-| `@import "tailwindcss"` | Single import replaces the old three `@tailwind` directives |
-| `@utility`              | New way to define custom utilities                          |
-| CSS-first config        | Design tokens as CSS variables in `:root`                   |
+**The preview follows the app.** The resolved theme is sent to the sandbox over `postMessage` as a
+`theme` request; the runtime toggles `.dark` and `colorScheme` on the sandbox's `<html>`. Verified
+in both directions (light → `class=""`, dark → `class="dark"`).
 
-### 11.3 TypeScript 7 specifics
+### 9.1 Obsolete storage
 
-| Concept                         | Detail                                                 |
-| ------------------------------- | ------------------------------------------------------ |
-| `baseUrl` removed               | Use `paths` with relative targets                      |
-| `import type`                   | Type-only imports are erased entirely                  |
-| `verbatimModuleSyntax` behavior | Mixing type and value imports requires explicit `type` |
-
-### 11.4 React 19 / Next 16 rendering
-
-| Concept                  | Detail                                                             |
-| ------------------------ | ------------------------------------------------------------------ |
-| Component instance reuse | Across route changes, `useRef` guards break                        |
-| Effects keyed on props   | `useEffect(..., [lesson.slug, markVisited])` re-runs correctly     |
-| FOUC prevention          | Inline script before paint, `suppressHydrationWarning` on `<html>` |
-| Functions in state       | A function passed to a setter is treated as an updater            |
-| Error boundaries          | Class components only; remount with a changing `key` to reset      |
-
-### 11.5 CSS layout
-
-| Concept                         | Detail                                                    |
-| ------------------------------- | --------------------------------------------------------- |
-| `min-width: auto` on grid items | The default that causes overflow; override with `min-w-0` |
-| `minmax(0, 1fr)`                | Correct grid track when content can overflow              |
-| oklch                           | Perceptually uniform color space; better for ramps        |
-
-### 11.6 Tooling
-
-| Concept                | Detail                                                              |
-| ---------------------- | ------------------------------------------------------------------- |
-| Sucrase                | Fast TS/TSX → JS transform, no type checking                        |
-| `jsxRuntime: automatic`| Emits `react/jsx-runtime` imports instead of `React.createElement`  |
-| `new Function` shim    | Evaluates CommonJS in the browser with a controlled `require`       |
-| CJS vs ESM output      | Sucrase's `imports` transform turns `export default` into `exports.default` |
+The removed progress feature wrote to **`react-lab-progress`**. `components/storage-cleanup.tsx`
+deletes that key once on mount, so old data does not linger in the browser. The `react-lab-theme`
+key is untouched. Verified in a browser: the progress key is removed, the theme key survives.
 
 ---
 
-## 12. Verification Results
+## 10. Styling and layout
 
-### 12.1 Build verification
+**Tailwind CSS v4** — no `tailwind.config.js`. The theme lives in an `@theme { … }` block in
+`app/globals.css`; the PostCSS plugin is `@tailwindcss/postcss` (configured in
+`postcss.config.mjs`).
+
+**Design tokens** are CSS custom properties on `:root` and `.dark`:
 
 ```
-> npm run typecheck
-> tsc -b
-(no output — 0 errors)
+--surface-base  --surface-raised  --surface-sunken
+--surface-border  --surface-border-strong
+--text-strong  --text-muted  --text-subtle
+--accent  --accent-contrast  --highlight
+```
 
-> npx next build
-▲ Next.js 16.4.2 (Turbopack)
-✓ Compiled successfully in 7.5s
-✓ Finished TypeScript in 5.5s
-✓ Generating static pages using 3 workers (11/11) in 5.8s
+The Emerald/Gold palette is preserved from the earlier design work.
 
+**Typography** — `next/font/google` provides Inter (`--font-inter`), JetBrains Mono
+(`--font-mono-code`) and Noto Sans Myanmar (`--font-myanmar`, subsets `["myanmar", "latin"]`), so
+Burmese text renders correctly.
+
+**Layout** (measured in a real browser):
+
+| Viewport   | Result                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| 1440 × 900 | Two columns. `scrollHeight === 900` — the page does **not** scroll. Editor 511 px, preview 515 px, console 160 px. |
+| 390 × 844  | Everything stacks vertically: editor (312 px) → preview (316 px) → console (160 px). No horizontal overflow.       |
+
+The two-column breakpoint is `lg`. Below it, the editor and preview sections carry
+`min-h-[380px]` so they stay usable; on large screens `lg:min-h-0` lets them fill the viewport.
+
+---
+
+## 11. Verification results
+
+All results below were **actually run and observed** on 2026-10-21.
+
+### 11.1 Commands
+
+| Command             | Result                                                                  |
+| ------------------- | ----------------------------------------------------------------------- |
+| `npm run typecheck` | **Exit code 0** — no errors (run with a cleared `tsconfig.tsbuildinfo`) |
+| `npx next build`    | **Exit code 0** — compiled successfully, no warnings, 6 pages generated |
+
+Build output route table:
+
+```
 Route (app)
 ┌ ○ /
 ├ ○ /_not-found
 ├ ƒ /api/playground/compile
-└   /lesson/[slug]
-  ├ ● /lesson/jsx-rendering
-  ├ ● /lesson/components
-  ├ ● /lesson/props
-  └ [+4 more paths]
-
-○  (Static)  prerendered as static content
-●  (SSG)     prerendered as static HTML (uses generateStaticParams)
-ƒ  (Dynamic) server-rendered on demand
+├ ƒ /playground/sandbox
+└ ƒ /playground/sandbox/vendor
 ```
 
-### 12.2 Functional verification (browser, Playwright)
+### 11.2 Browser verification (Playwright against `next dev`)
 
-| Test                                | Result                                                                              |
-| ----------------------------------- | ----------------------------------------------------------------------------------- |
-| `/` redirects to first lesson       | ✅ `307 → /lesson/jsx-rendering`                                                    |
-| Sidebar navigation between lessons  | ✅ client-side routing works                                                        |
-| Code pane renders with highlighting | ✅ 24 tokens on the State & Events lesson                                           |
-| Light mode token colors             | ✅ keyword `rgb(4,120,87)`, function `rgb(180,83,9)`, string `rgb(124,58,237)`      |
-| Dark mode token colors              | ✅ keyword `rgb(52,211,153)`, function `rgb(251,191,36)`, string `rgb(196,181,253)` |
-| Theme toggle persists across reload | ✅ `localStorage["react-lab-theme"]` = `"light"` after reload                       |
-| System preference following         | ✅ media query listener active                                                      |
-| Progress counter increments         | ✅ 1 → 2 → 3 across navigations                                                     |
-| Sidebar ✓ badges                    | ✅ render for completed lessons                                                     |
-| Streak counter                      | ✅ `1 day streak` persisted                                                         |
-| Interactive demo (NameInput)        | ✅ typing updates output text                                                       |
-| Interactive demo (ProfileEditor)    | ✅ "Load Demo User" button updates heading                                          |
-| Interactive demo (SearchBox)        | ✅ form renders                                                                     |
-| 404 for unknown slug                | ✅ `/lesson/does-not-exist` → 404 page                                              |
-| Mobile 390px — no overflow          | ✅ `scrollWidth === clientWidth === 375`                                            |
-| Desktop 1440px layout               | ✅ two-column grid, sticky sidebar                                                  |
+| #   | Check                                                    | Result                                                                                                                        |
+| --- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `/` opens the playground directly (no redirect, no hero) | ✅ editor + preview + console present; title "React Code Playground"                                                          |
+| 2   | All 8 root-level `.tsx` files appear in the selector     | ✅ 8 tabs                                                                                                                     |
+| 3   | Editing the source updates the preview                   | ✅ `<h2 id="s4">STEP4-OK</h2>`                                                                                                |
+| 4   | Compile error is displayed clearly                       | ✅ `role="alert"`, "Compile မအောင်မြင်ပါ", status badge → `error`; the app keeps running                                      |
+| 5   | Runtime error is displayed clearly                       | ✅ `role="alert"`, "Runtime error ဖြစ်ပါတယ်" + the thrown message; the app keeps running                                      |
+| 6   | Reset restores the file's original content               | ✅ original source restored, preview back to the original component, button becomes disabled                                  |
+| 7   | Console output                                           | ✅ `log — step4 verified`; the **Clear** button empties the panel                                                             |
+| 8   | Theme switching                                          | ✅ Light / Dark / System all apply to the app **and** the preview iframe; `aria-pressed` updates; persisted to `localStorage` |
+| 9   | Desktop layout                                           | ✅ two columns, no page scroll, no horizontal overflow                                                                        |
+| 10  | Mobile layout                                            | ✅ stacked vertically, no horizontal overflow                                                                                 |
+| 11  | Every practice file renders                              | ✅ see the table below                                                                                                        |
+| 12  | Removed lesson routes are gone                           | ✅ `/lesson/jsx-rendering` → **404**                                                                                          |
+| 13  | Dev server binding                                       | ✅ listening socket is `127.0.0.1:3000` only                                                                                  |
 
-### 12.3 Playground verification (browser)
+**Per-file render results (all 8):**
 
-| Test                                          | Result                                                                 |
-| --------------------------------------------- | ---------------------------------------------------------------------- |
-| Home page shows the playground                 | ✅ 8 root `.tsx` files discovered automatically                         |
-| Sidebar hidden on `/`, shown on `/lesson/*`    | ✅ both confirmed in the DOM                                          |
-| Every file renders its component               | ✅ all 8 tabs produce the expected output (see the table below)        |
-| Editing the code updates the preview           | ✅ typed a counter, the preview re-rendered with `Count: 0`            |
-| State works inside the preview                 | ✅ clicking the button changed it to `Count: 1`                       |
-| `console.log` is captured                      | ✅ "hello from playground" appeared in the console strip               |
-| Compile error shows inline                     | ✅ "Error transforming P2L3.tsx: Unexpected token (4:1)"                |
-| Runtime error shows inline                     | ✅ "Cannot read properties of null (reading 'foo')" + stack trace     |
-| Errors are announced to screen readers         | ✅ `role="alert"` on both the compile error and the boundary error     |
-| Non-exported components resolve                | ✅ `UserList`, `UserProfile`, `ExplicitSyntaxDemo` all rendered        |
-| Commented-out file is handled                  | ✅ `event_handler.tsx` shows an explanation instead of failing         |
-| Production build behaves the same              | ✅ `next start` on port 3100, same results                             |
+| File                  | Preview output                                                       |
+| --------------------- | -------------------------------------------------------------------- |
+| `P2L3.tsx`            | `<form><input type="text"><button>Search</button></form>`            |
+| `P2L4.tsx`            | `<button> Fetch </button>`                                           |
+| `p2l5.tsx`            | `<h1> No User Loaded </h1> … Load Demo User / Clear`                 |
+| `p2l6.tsx`            | `<input type="text"><p></p>`                                         |
+| `p2l7.tsx`            | `<article><h2>Mingalarpar</h2><p>Duration: 60</p>…</article>`        |
+| `index.tsx`           | `<h2> Mingalarpar Online </h2><p>Age: <p>28</p></p>`                 |
+| `explicit_syntax.tsx` | _(empty — the component has no `return` statement; no error shown)_  |
+| `event_handler.tsx`   | _(no preview — the file is entirely commented out; a note is shown)_ |
 
-Per-file preview results:
+### 11.3 Isolation checks (measured inside the sandbox frame)
 
-| File                    | Rendered output                                  |
-| ----------------------- | ------------------------------------------------ |
-| `P2L3.tsx`              | Search form                                      |
-| `P2L4.tsx`              | Fetch button                                     |
-| `event_handler.tsx`     | "component မရှိသေးပါ" (all comments)         |
-| `explicit_syntax.tsx`   | empty (the component has no `return` yet)        |
-| `index.tsx`             | Mingalarpar / Online / Age: 28                  |
-| `p2l5.tsx`              | No User Loaded / Load Demo User / Clear          |
-| `p2l6.tsx`              | Name input                                       |
-| `p2l7.tsx`              | Mingalarpar / Duration: 60 / Deparminhtet        |
+| Attempt                                                          | Result                                 |
+| ---------------------------------------------------------------- | -------------------------------------- |
+| Read `window.parent.document`                                    | `SecurityError`                        |
+| Read `window.parent.location`                                    | `SecurityError`                        |
+| Read `window.parent.localStorage`                                | `SecurityError`                        |
+| Read `window.localStorage`                                       | `SecurityError`                        |
+| Read `document.cookie`                                           | `SecurityError`                        |
+| `window.origin`                                                  | `"null"`                               |
+| `fetch()` to the compile API                                     | blocked by `connect-src 'none'`        |
+| `eval("1+1")`                                                    | `EvalError`                            |
+| `postMessage` with a wrong token                                 | rejected; the module was not evaluated |
+| `postMessage` with the correct token **from inside the sandbox** | **accepted — the known limitation**    |
+
+### 11.4 Stale-reference sweep
+
+```
+git grep -n -E "lesson|useProgress|ProgressProvider|streak|visited|code-pane|
+  lesson-demos|lesson-view|progress-store|lib/lessons|lesson-index|lab-sidebar"
+```
+
+The only remaining matches are (a) comments inside the learner's own practice files and (b) the
+comments in `lib/storage.ts` / `components/storage-cleanup.tsx` that explain _why_ the obsolete key
+is deleted. There are **no** imports of any removed module, and **no** references to `/lesson/*`.
+
+Dependency audit: every declared dependency is used. `prism-react-renderer` was already removed in
+the lesson-cleanup step.
 
 ---
 
-## 13. Remaining Known Issues
+## 12. Remaining known limitations
 
-These were identified but **not** fixed, either by the learner's choice or as out of scope:
-
-### 13.1 `P2L3.tsx` — component invoked at module level
-
-```tsx
-export default SearchBox(); // ❌
-```
-
-Not yet imported by any route, so the error is latent. Will crash with "Invalid hook call" if a lesson ever imports it directly. Currently works because it is wrapped by `SearchBoxDemo` in `components/lesson-demos.tsx`.
-
-### 13.2 `explicit_syntax.tsx` — unused state
-
-```tsx
-const [item, setItem] = useState<string[]>([]);
-const [theme, setTheme] = useState<selectedTheme>("light");
-```
-
-Neither value is read. Intentional for the lesson, but `noUnusedLocals` was deliberately **not** enabled so it would not break the practice file. The playground renders it as-is, which shows an empty preview because the component has no `return` statement.
-
-### 13.3 `p2l5.tsx` / `p2l6.tsx` — `'use client'` placement
-
-Both files have the directive on line 2, after a comment. The directive must be the first statement, so these files are **not** actually client components. They currently work because they are only imported from an already-client module.
-
-### 13.4 Lesson snippets are duplicated
-
-`lib/lessons.ts` contains hand-copied code snippets. If the learner edits `p2l6.tsx`, the code pane will not update. A future improvement would read the source file at build time.
-
-### 13.5 No ESLint
-
-By explicit decision. `npm run typecheck` covers type safety only.
-
-### 13.6 `P2L4.tsx` and `index.tsx` have no lesson demo
-
-`UserList`, `UserStatus`, and `UserProfile` are not registered in `components/lesson-demos.tsx`, so they do not appear in the lesson pages. They *are* available in the Home Page playground, which registers them in `lib/playground/registry.tsx`.
-
-### 13.7 The playground compiles but does not type-check
-
-Sucrase strips types without checking them, so the playground will happily run code that `tsc` would reject. This is deliberate — the point is to experiment quickly — but it means type errors only surface in the editor, not in the preview. Run `npm run typecheck` to see them.
+| #   | Limitation                                                                                   | Impact                                                                         |
+| --- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 1   | The sandbox is **not** a security boundary — code inside it can forge console/error messages | Cosmetic spoofing of the console panel only                                    |
+| 2   | `POST /api/playground/compile` is unauthenticated                                            | Only reachable on 127.0.0.1; it transforms, never executes                     |
+| 3   | The compile step does **not** type-check                                                     | Type errors pass silently; only syntax errors are caught                       |
+| 4   | `index.tsx` renders `<p>` inside `<p>`                                                       | React logs "cannot be a descendant of `<p>`" — this is the learner's own file  |
+| 5   | `explicit_syntax.tsx` has no `return` statement                                              | The preview is empty; no error is reported (React allows a `undefined` return) |
+| 6   | `event_handler.tsx` is entirely commented out                                                | Shows a note instead of a preview — expected                                   |
+| 7   | Next.js logs a "font was preloaded but not used" warning                                     | Cosmetic; caused by `next/font` preloading the Myanmar/Inter subsets           |
+| 8   | There is no ESLint configuration                                                             | `npx next lint` is not valid in Next 16                                        |
+| 9   | `import.meta.glob` is Turbopack-only                                                         | The project cannot be built with webpack                                       |
 
 ---
 
-## 14. Next Steps
-
-### Immediate (recommended)
-
-1. **Run the dev server and explore:**
-
-   ```bash
-   npm run dev
-   ```
-
-   Open `http://localhost:3000` — the home page is now a landing page with the live playground.
-
-2. **Pick a file in the playground and edit it.** The preview updates as you type.
-
-3. **Try the theme toggle** in the header and watch the code pane re-color.
-
-4. **Navigate between lessons** and watch the progress counter and ✓ badges update.
-
-5. **Resize the window** to verify the responsive two-column → single-column transition.
-
-### Learning opportunities
-
-6. **Study the Server/Client boundary** — compare `lib/lessons.ts` (server-safe) with `components/lesson-demos.tsx` (client-only), and see how `demoKey` bridges them.
-
-7. **Add a lesson.** The registry is data-driven:
-   - Add an entry to `lib/lessons.ts` with a new `slug`
-   - Register a demo in `components/lesson-demos.tsx` if needed
-   - The route, sidebar, and metadata update automatically
-
-8. **Fix the latent issues in Section 13** as practice exercises:
-   - `P2L3.tsx` — fix the module-level invocation
-   - `p2l5.tsx` / `p2l6.tsx` — move `'use client'` to line 1
-   - `explicit_syntax.tsx` — actually use the state
-
-### Optional enhancements
-
-9. **Sync code snippets with source files** — read the file at build time instead of duplicating.
-10. **Add a "reset progress" button** — the `reset()` function already exists in `progress-store.tsx` but has no UI.
-11. **Add search / keyboard navigation** (Cmd+K) to the sidebar.
-12. **Add the remaining lesson demos** — `UserList`, `UserStatus`, `UserProfile` (they are in the playground already).
-13. **Show TypeScript errors in the playground** — run the type checker alongside Sucrase so type mistakes are visible in the editor.
-14. **Reconsider ESLint** once the lesson files are cleaned up.
-
----
-
-## Appendix A — Commands Reference
+## Appendix A — Command reference
 
 ```bash
-# Development
-npm run dev                    # Start dev server (Turbopack)
+# Development (binds to 127.0.0.1 only)
+npm run dev
 
 # Verification
-npm run typecheck              # tsc -b — TypeScript only
-npx next build                 # Production build + prerender
-npx next start -p 3100         # Serve the production build
+npm run typecheck        # tsc -b
+npx next build           # production build
+npx next start           # serve the production build
 
-# Package management (Windows note: use npm.cmd if npm is not on PATH)
-npm install prism-react-renderer
-npm install sucrase            # Server-side TSX compiler for the playground
-npm install -D @tailwindcss/postcss postcss
+# Package management
+npm install
+npm uninstall <package>
+
+# Windows note
+# If npm is not on PATH, use npm.cmd / npx.cmd
 ```
 
 ---
 
-## Appendix B — Data Structures
+## Appendix B — Message protocol
 
-### Lesson registry entry
+Defined in `lib/playground/protocol.ts`.
 
-```ts
-{
-  slug: "state-events",        // URL segment: /lesson/state-events
-  number: "04",                // Display badge
-  title: "State & Events",     // Heading
-  detail: "Create interactive UI",  // Subtitle
-  concept: "useState က component အတွင်းရှိ ...",  // Explanation (Burmese)
-  file: "p2l6.tsx",            // Source file label
-  language: "tsx",             // Prism language
-  code: `const [name, setName] = useState('')`,  // Displayed snippet
-  demoKey: "name-input",       // → components/lesson-demos.tsx
-}
-```
+### App → sandbox
 
-### localStorage keys
+| Type     | Payload                                   |
+| -------- | ----------------------------------------- |
+| `render` | `{ token, type, code, component, props }` |
+| `theme`  | `{ token, type, theme }`                  |
+| `clear`  | `{ token, type }`                         |
 
-| Key                  | Shape                                                                | Written by                      |
-| -------------------- | -------------------------------------------------------------------- | ------------------------------- |
-| `react-lab-theme`    | `"light" \| "dark" \| "system"`                                      | `components/theme-provider.tsx` |
-| `react-lab-progress` | `{ completed: string[], streak: number, lastVisit: string \| null }` | `components/progress-store.tsx` |
+### Sandbox → app
+
+| Type       | Payload                                  |
+| ---------- | ---------------------------------------- |
+| `ready`    | `{ token, type }`                        |
+| `rendered` | `{ token, type }`                        |
+| `cleared`  | `{ token, type }`                        |
+| `log`      | `{ token, type, level, text }`           |
+| `error`    | `{ token, type, kind, message, stack? }` |
+
+`kind` is `"no-component"` (the file compiled but has nothing to render) or `"runtime"` (the code
+threw). `level` is one of `log`, `info`, `warn`, `error`.
+
+Both sides validate the message shape (`isSandboxMessage`) and the token. The app additionally
+checks `event.source === iframe.contentWindow`.
 
 ---
 
 ## Appendix C — Glossary
 
-| Term               | Meaning in this project                                                  |
-| ------------------ | ------------------------------------------------------------------------ |
-| **Lab shell**      | The persistent frame: header + lesson sidebar + content area             |
-| **Code pane**      | Left half of the lesson view — syntax-highlighted source                 |
-| **Render area**    | Right half of the lesson view — live interactive demo                    |
-| **demoKey**        | String linking server-safe lesson data to a client-side demo component   |
-| **Semantic token** | A CSS variable like `--surface-raised` that changes value with the theme |
-| **FOUC**           | Flash of Unstyled Content — wrong theme shown before CSS/paint           |
-| **SSG**            | Static Site Generation — HTML prerendered at build time                  |
-
----
-
-## Appendix D — Repository
-
-**Remote:** https://github.com/d9p9m9h/react-next.js-typescript_learning
-**Branch:** `master` (tracking `origin/master`)
-
-> Commit messages in this repository follow the pattern `Phase N — Lesson X: <description>`.
-
----
-
-_End of summary._
+| Term              | Meaning                                                                    |
+| ----------------- | -------------------------------------------------------------------------- |
+| **Practice file** | A root-level `.tsx` file the learner edits. Never written to by the app.   |
+| **Sandbox**       | The preview iframe and its document. Opaque origin, strict CSP.            |
+| **Token**         | A random string shared by the app and the sandbox; authenticates messages. |
+| **Vendor bundle** | React's CommonJS builds wrapped in a tiny `require` registry.              |
+| **Turbopack**     | Next 16's bundler. Provides `import.meta.glob` and the `?raw` rule.        |
+| **Sucrase**       | The TypeScript/JSX transformer used by the compile endpoint.               |
+| **FOUC**          | Flash of Unstyled Content — prevented by the inline theme boot script.     |

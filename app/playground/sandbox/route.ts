@@ -15,16 +15,23 @@ import { escapeForScript } from "@/lib/playground/vendor";
  *
  * That combination gives the frame an opaque origin:
  *
- * - it cannot read the app's DOM, cookies, `localStorage` or `fetch`;
+ * - it cannot read the app's DOM, cookies or `localStorage`;
  * - the app cannot reach into the frame's document;
  * - `event.origin` is the literal string `"null"` on both sides, so the
  *   shared token (see `lib/playground/protocol.ts`) is what actually
  *   authenticates a message.
  *
- * This is a *learning* sandbox on a local machine, not a security
- * boundary for untrusted internet users. It keeps the learner's code away
- * from the app's own state and DOM, which is what the playground needs;
- * it is not a claim that arbitrary code is safely contained.
+ * The document's own Content Security Policy blocks the network
+ * (`connect-src 'none'`) and dynamic code evaluation (`script-src` has no
+ * `'unsafe-eval'`), so the learner's code cannot call the compile API or
+ * run `eval()`.
+ *
+ * **What this is not:** a security boundary for untrusted internet users.
+ * The learner's code runs *in* the frame that holds the shared token, so
+ * it can read that token and post messages the app will accept — it can
+ * forge console output and error reports. It is a learning aid on a local
+ * machine that keeps the learner's code away from the app's own state and
+ * DOM; it is not a claim that arbitrary code is safely contained.
  */
 
 /**

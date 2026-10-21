@@ -4,8 +4,8 @@ import { transform } from "sucrase";
  * Compiles a learner's TSX source into browser-runnable JavaScript.
  *
  * The compile step runs on the server so the browser never has to download
- * a compiler. The response is a plain CommonJS module that the client
- * evaluates inside a function with `react` (and friends) in scope.
+ * a compiler. The response is a plain CommonJS module, which the sandbox
+ * runtime evaluates inside the preview iframe (never in the app window).
  */
 
 export type CompileRequest = {

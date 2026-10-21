@@ -57,7 +57,9 @@ type PlaygroundPreviewProps = {
  *
  * > The sandbox is a learning aid on a local machine, not a security
  * > boundary for untrusted internet users. Its job is to keep the
- * > learner's code away from the app's own state and DOM.
+ * > learner's code away from the app's own state and DOM. Note that the
+ * > code runs in the frame that holds the shared token, so it can forge
+ * > console and error messages — see `lib/playground/protocol.ts`.
  *
  * Both sides talk over `postMessage`. Because an opaque origin reports
  * `event.origin` as the literal string `"null"`, the origin cannot be
