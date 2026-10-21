@@ -29,11 +29,11 @@ const myanmar = Noto_Sans_Myanmar({
 
 export const metadata: Metadata = {
   title: {
-    default: "React Learning Lab",
-    template: "%s | React Learning Lab",
+    default: "React Code Playground",
+    template: "%s | React Code Playground",
   },
   description:
-    "A hands-on workspace for learning React, TypeScript, and Next.js.",
+    "A local workspace for experimenting with React and TypeScript code.",
 };
 
 export const viewport: Viewport = {

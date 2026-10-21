@@ -54,6 +54,8 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
   const pendingLogsRef = useRef<ConsoleEntry[]>([]);
   /** The pending flush timer for buffered console entries. */
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The tab buttons, so keyboard navigation can move the focus. */
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const activeFile = useMemo(
     () => files.find((file) => file.name === activeName) ?? files[0],
@@ -194,15 +196,54 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
     }));
   }
 
+  /**
+   * Moves the selection with the arrow keys.
+   *
+   * The file list is a `tablist`, so the ARIA tabs pattern expects the
+   * arrow keys to move between tabs, `Home` / `End` to jump to the ends.
+   */
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    const index = files.findIndex((file) => file.name === activeName);
+    if (index === -1) return;
+
+    let nextIndex: number | null = null;
+
+    switch (event.key) {
+      case "ArrowRight":
+        nextIndex = (index + 1) % files.length;
+        break;
+      case "ArrowLeft":
+        nextIndex = (index - 1 + files.length) % files.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = files.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+
+    const next = files[nextIndex];
+    setActiveName(next.name);
+    tabRefs.current[next.name]?.focus();
+  }
+
   const dirty = activeFile ? source !== activeFile.source : false;
 
+  /** Whether the last compile or render produced a visible problem. */
+  const hasError = Boolean(compileError) || Boolean(runtimeError);
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* File tabs */}
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {/* File selector */}
       <div
         role="tablist"
         aria-label="Playground files"
-        className="scrollbar-slim -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1"
+        className="scrollbar-slim -mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-1"
       >
         {files.map((file) => {
           const isActive = file.name === activeName;
@@ -211,12 +252,17 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
           return (
             <button
               key={file.name}
+              ref={(node) => {
+                tabRefs.current[file.name] = node;
+              }}
               type="button"
               role="tab"
               aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveName(file.name)}
+              onKeyDown={handleTabKeyDown}
               className={[
-                "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 text-left transition-colors",
+                "flex shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
                 isActive
                   ? "border-[var(--highlight)] bg-[var(--highlight)]/10 text-[var(--highlight)]"
                   : "border-[var(--surface-border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:border-[var(--surface-border-strong)] hover:text-[var(--text-strong)]",
@@ -226,7 +272,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
                 {file.name}
               </span>
               {info?.label ? (
-                <span className="rounded-md bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-subtle)]">
+                <span className="hidden rounded-md bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-subtle)] sm:inline">
                   {info.label}
                 </span>
               ) : null}
@@ -236,15 +282,15 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
       </div>
 
       {/* Editor + preview */}
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-2">
-        <section className="flex min-h-[420px] min-w-0 flex-col">
-          <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
+        <section className="flex min-h-[380px] min-w-0 flex-col lg:min-h-0">
+          <h2 className="mb-2 flex shrink-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
             <span
               aria-hidden="true"
               className="size-1.5 rounded-full bg-[var(--accent)]"
             />
             Source · ရေးမယ့် code
-          </h3>
+          </h2>
           <div className="min-h-0 min-w-0 flex-1">
             <PlaygroundEditor
               value={source}
@@ -258,27 +304,44 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
           </div>
         </section>
 
-        <section className="flex min-h-[420px] min-w-0 flex-col">
-          <h3 className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+        <section className="flex min-h-[380px] min-w-0 flex-col lg:min-h-0">
+          <h2 className="mb-2 flex shrink-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
             <span
               aria-hidden="true"
               className="size-1.5 rounded-full bg-[var(--highlight)]"
             />
             Preview · ရလဒ်
-          </h3>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-raised)]">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--surface-border)] px-4 py-2.5">
+          </h2>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-raised)]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--surface-border)] px-3 py-2">
               <div className="flex items-center gap-2">
                 <span
                   aria-hidden="true"
-                  className="size-2 rounded-full bg-emerald-500"
+                  className={[
+                    "size-2 rounded-full",
+                    hasError
+                      ? "bg-rose-500"
+                      : status === "compiling"
+                        ? "bg-amber-500"
+                        : "bg-emerald-500",
+                  ].join(" ")}
                 />
                 <span className="text-[11px] font-semibold text-[var(--text-muted)]">
                   Rendered result
                 </span>
               </div>
-              <span className="rounded-md border border-[var(--surface-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                live
+              <span
+                aria-live="polite"
+                className={[
+                  "rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                  hasError
+                    ? "border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                    : status === "compiling"
+                      ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      : "border-[var(--surface-border)] text-[var(--text-subtle)]",
+                ].join(" ")}
+              >
+                {hasError ? "error" : status === "compiling" ? "compiling" : "live"}
               </span>
             </div>
 
@@ -331,7 +394,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
       </div>
 
       {/* Console */}
-      <section className="flex h-40 min-w-0 flex-col">
+      <section className="flex h-40 min-w-0 shrink-0 flex-col">
         <PlaygroundConsole
           entries={consoleEntries}
           onClear={() => setConsoleEntries([])}

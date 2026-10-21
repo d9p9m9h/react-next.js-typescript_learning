@@ -32,7 +32,7 @@ const LEVEL_LABEL: Record<ConsoleEntry["level"], string> = {
  */
 export function PlaygroundConsole({ entries, onClear }: PlaygroundConsoleProps) {
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-sunken)]">
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)]">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--surface-border)] px-4 py-2">
         <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
           Console
@@ -41,7 +41,7 @@ export function PlaygroundConsole({ entries, onClear }: PlaygroundConsoleProps) 
           type="button"
           onClick={onClear}
           disabled={entries.length === 0}
-          className="rounded-md border border-[var(--surface-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] transition-colors hover:border-[var(--surface-border-strong)] hover:text-[var(--text-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md border border-[var(--surface-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] transition-colors hover:border-[var(--surface-border-strong)] hover:text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Clear
         </button>

@@ -76,7 +76,7 @@ export function PlaygroundEditor({
   }[status];
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-sunken)]">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)]">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--surface-border)] px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <span
@@ -120,7 +120,7 @@ export function PlaygroundEditor({
               type="button"
               onClick={onReset}
               disabled={!dirty}
-              className="rounded-md border border-[var(--surface-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] transition-colors hover:border-[var(--surface-border-strong)] hover:text-[var(--text-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md border border-[var(--surface-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] transition-colors hover:border-[var(--surface-border-strong)] hover:text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Reset
             </button>
@@ -128,7 +128,7 @@ export function PlaygroundEditor({
         </div>
       </div>
 
-      <div className="scrollbar-slim min-h-0 flex-1 overflow-auto">
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-auto focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[var(--accent)]">
         <label className="sr-only" htmlFor="playground-source">
           {fileName} ရဲ့ source code
         </label>
