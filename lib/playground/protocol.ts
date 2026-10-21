@@ -154,10 +154,27 @@ export function isSandboxMessage(value: unknown): value is SandboxMessage {
     case "rendered":
     case "cleared":
       return true;
-    case "error":
-      return typeof (candidate as SandboxErrorMessage).message === "string";
-    case "log":
-      return typeof (candidate as SandboxLogMessage).text === "string";
+
+    case "error": {
+      const error = candidate as SandboxErrorMessage;
+      return (
+        typeof error.message === "string" &&
+        (error.kind === "no-component" || error.kind === "runtime") &&
+        (error.stack === undefined || typeof error.stack === "string")
+      );
+    }
+
+    case "log": {
+      const log = candidate as SandboxLogMessage;
+      return (
+        typeof log.text === "string" &&
+        (log.level === "log" ||
+          log.level === "info" ||
+          log.level === "warn" ||
+          log.level === "error")
+      );
+    }
+
     default:
       return false;
   }

@@ -23,13 +23,18 @@ import type {
   SandboxLogLevel,
   SandboxMessage,
   SandboxRequest,
-} from "./evaluate";
+} from "./protocol";
 
 type VendorBundle = {
   React: any;
   ReactDOM: any;
   ReactDOMClient: any;
   jsxRuntime: any;
+  /**
+   * React APIs that are injected as bare globals inside the evaluated
+   * module, so a learner's file works even without an `import` line.
+   */
+  globals?: Record<string, unknown>;
 };
 
 type SandboxConfig = {
@@ -46,18 +51,27 @@ type Scope = {
   __pbApi?: {
     module: { exports: Record<string, unknown> };
     require(id: string): unknown;
+    globals: Record<string, unknown>;
   };
 };
 
 const scope = globalThis as unknown as Scope;
-const config = scope.__pbConfig;
-const vendor = scope.__pbVendor;
+const rawConfig = scope.__pbConfig;
+const rawVendor = scope.__pbVendor;
 
-if (!config || !vendor) {
+if (!rawConfig || !rawVendor) {
   throw new Error(
     "Playground sandbox runtime was initialised without its config or vendor bundle.",
   );
 }
+
+/*
+ * The narrowed values are re-bound to new constants. TypeScript does not
+ * carry a narrowing into a nested function body, and the helpers below
+ * all close over these two values.
+ */
+const config: SandboxConfig = rawConfig;
+const vendor: VendorBundle = rawVendor;
 
 const React = vendor.React;
 const ReactDOMClient = vendor.ReactDOMClient;
@@ -167,9 +181,20 @@ function requireShim(id: string): unknown {
 const api: NonNullable<Scope["__pbApi"]> = {
   module: { exports: {} },
   require: requireShim,
+  globals: vendor.globals ?? {},
 };
 
 scope.__pbApi = api;
+
+/**
+ * The names that are injected as bare globals into the evaluated module.
+ *
+ * Only plain identifiers are accepted, so the generated function
+ * signature can never be corrupted by the names themselves.
+ */
+const globalNames = Object.keys(api.globals).filter((name) =>
+  /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name),
+);
 
 /**
  * Evaluates a compiled CommonJS module.
@@ -185,12 +210,24 @@ function evaluateModule(code: string): Record<string, unknown> {
   const module = { exports: {} as Record<string, unknown> };
   api.module = module;
 
+  const parameters = ["exports", "module", "require", ...globalNames].join(", ");
+  const arguments_ = [
+    "__pbApi.module.exports",
+    "__pbApi.module",
+    "__pbApi.require",
+    ...globalNames.map((name) => `__pbApi.globals[${JSON.stringify(name)}]`),
+  ].join(", ");
+
   const script = document.createElement("script");
   script.nonce = config.nonce;
   script.textContent =
-    "(function (exports, module, require) {\n" +
+    "(function (" +
+    parameters +
+    ") {\n" +
     code +
-    "\n})(__pbApi.module.exports, __pbApi.module, __pbApi.require);";
+    "\n})(" +
+    arguments_ +
+    ");";
 
   try {
     document.head.appendChild(script);

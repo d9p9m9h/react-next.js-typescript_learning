@@ -1,18 +1,16 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentType,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PlaygroundConsole, type ConsoleEntry } from "@/components/playground/playground-console";
 import { PlaygroundEditor } from "@/components/playground/playground-editor";
 import { PlaygroundErrorBoundary } from "@/components/playground/playground-error-boundary";
-import { compileAndSelect } from "@/lib/playground/evaluate";
+import {
+  PlaygroundPreview,
+  type SandboxErrorReport,
+  type SandboxLogEntry,
+} from "@/components/playground/playground-preview";
+import { useTheme } from "@/components/theme-provider";
 import type { PlaygroundFile } from "@/lib/playground/files";
 import { playgroundTargets } from "@/lib/playground/registry";
 
@@ -26,43 +24,36 @@ type PlaygroundProps = {
 type Status = "idle" | "compiling" | "ok" | "error";
 
 /**
- * A component resolved from the learner's source, kept outside of React
- * state.
- *
- * Storing a component in `useState` would make React treat the value as a
- * state updater function, so the resolved component is held in a ref
- * instead. The `version` counter is what actually lives in state: it
- * changes whenever a new component is resolved, which re-renders the
- * preview.
- */
-type ResolvedComponent = {
-  component: ComponentType;
-  version: number;
-};
-
-/**
  * The live playground.
  *
  * Selecting a file loads its source into the editor. Editing the source
  * sends it to `/api/playground/compile`, which runs Sucrase on the server
- * and returns plain CommonJS. The client evaluates that module with
- * `react` in scope and renders the selected component.
+ * and returns plain CommonJS. That module is handed to the isolated
+ * preview (`components/playground/playground-preview.tsx`), which runs it
+ * inside a sandboxed iframe and reports console output and runtime
+ * errors back to this page.
  */
 export function Playground({ files, initialFile }: PlaygroundProps) {
+  const { resolvedTheme } = useTheme();
   const [activeName, setActiveName] = useState(initialFile);
   const [buffers, setBuffers] = useState<Record<string, string>>(() =>
     Object.fromEntries(files.map((file) => [file.name, file.source])),
   );
   const [status, setStatus] = useState<Status>("idle");
   const [compileError, setCompileError] = useState<string | null>(null);
+  const [runtimeError, setRuntimeError] = useState<SandboxErrorReport | null>(
+    null,
+  );
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
-  const [resolved, setResolved] = useState<ResolvedComponent | null>(null);
+  const [compiledCode, setCompiledCode] = useState<string | null>(null);
 
   // Guards against a slow compile response overwriting a newer one.
   const requestIdRef = useRef(0);
   const consoleIdRef = useRef(0);
   /** Console entries waiting to be flushed into React state. */
   const pendingLogsRef = useRef<ConsoleEntry[]>([]);
+  /** The pending flush timer for buffered console entries. */
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeFile = useMemo(
     () => files.find((file) => file.name === activeName) ?? files[0],
@@ -85,6 +76,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
       const id = ++requestIdRef.current;
       setStatus("compiling");
       setCompileError(null);
+      setRuntimeError(null);
 
       try {
         const response = await fetch("/api/playground/compile", {
@@ -108,43 +100,17 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
         if (!result.ok || !result.code) {
           setStatus("error");
           setCompileError(result.error ?? "Compile မအောင်မြင်ပါ။");
-          setResolved(null);
+          setCompiledCode(null);
           return;
         }
 
-        try {
-          const { component: found } = compileAndSelect(
-            result.code,
-            componentName,
-          );
-
-          if (id !== requestIdRef.current) return;
-
-          if (typeof found !== "function") {
-            setStatus("error");
-            setCompileError(
-              `"${componentName}" က component မဟုတ်ပါ။ Preview ထဲမှာ ပြန်ပါမယ်။`,
-            );
-            setResolved(null);
-            return;
-          }
-
-          setResolved({
-            component: found as ComponentType,
-            version: id,
-          });
-          setStatus("ok");
-        } catch (error) {
-          if (id !== requestIdRef.current) return;
-          setStatus("error");
-          setCompileError((error as Error).message);
-          setResolved(null);
-        }
+        setCompiledCode(result.code);
+        setStatus("ok");
       } catch {
         if (id !== requestIdRef.current) return;
         setStatus("error");
         setCompileError("Compile API ကို မေးနိုင်ခဲ့ပါ။ Server ကို စစ်ပါ။");
-        setResolved(null);
+        setCompiledCode(null);
       }
     },
     [componentName],
@@ -162,84 +128,57 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
     return () => clearTimeout(timer);
   }, [activeFile, source, run, hasNoComponent]);
 
-  // Capture console output from the learner's component.
+  // Clear the preview when the active file has nothing to render.
   useEffect(() => {
-    const original = {
-      log: console.log,
-      info: console.info,
-      warn: console.warn,
-      error: console.error,
-    };
+    if (!hasNoComponent) return;
+    setCompiledCode(null);
+    setStatus("idle");
+  }, [hasNoComponent]);
 
-    function format(args: unknown[]): string {
-      return args
-        .map((arg) => {
-          if (typeof arg === "string") return arg;
-          if (arg instanceof Error) return arg.message;
-          try {
-            return JSON.stringify(arg, null, 2) ?? String(arg);
-          } catch {
-            return String(arg);
-          }
-        })
-        .join(" ");
-    }
-
-    function capture(level: ConsoleEntry["level"]) {
-      return (...args: unknown[]) => {
-        // Next.js dev tools log their own progress messages. They are
-        // noise in the learner's console, so they are skipped.
-        const first = args[0];
-        if (
-          typeof first === "string" &&
-          (first.startsWith("[Fast Refresh]") ||
-            first.startsWith("[HMR]") ||
-            first.startsWith("[DevTools]"))
-        ) {
-          original[level](...args);
-          return;
-        }
-
-        const text = format(args);
-        const entry: ConsoleEntry = {
-          id: ++consoleIdRef.current,
-          level,
-          text,
-        };
-
-        // The entry is buffered in a ref and flushed on a timer. Writing
-        // to React state directly would re-render the playground on every
-        // log call, and React's own development logging would loop.
-        pendingLogsRef.current.push(entry);
-        scheduleFlush();
-      };
-    }
-
-    let flushTimer: ReturnType<typeof setTimeout> | null = null;
-
-    function scheduleFlush() {
-      if (flushTimer !== null) return;
-      flushTimer = setTimeout(() => {
-        flushTimer = null;
-        const pending = pendingLogsRef.current;
-        if (pending.length === 0) return;
-        pendingLogsRef.current = [];
-        setConsoleEntries((prev) => [...prev, ...pending].slice(-200));
-      }, 120);
-    }
-
-    console.log = capture("log");
-    console.info = capture("info");
-    console.warn = capture("warn");
-    console.error = capture("error");
-
+  // Flush any buffered console entries when the playground unmounts.
+  useEffect(() => {
     return () => {
-      if (flushTimer !== null) clearTimeout(flushTimer);
-      console.log = original.log;
-      console.info = original.info;
-      console.warn = original.warn;
-      console.error = original.error;
+      if (flushTimerRef.current !== null) {
+        clearTimeout(flushTimerRef.current);
+      }
     };
+  }, []);
+
+  /**
+   * A log line from inside the sandbox.
+   *
+   * The entry is buffered in a ref and flushed on a timer. Writing to
+   * React state directly would re-render the playground on every log
+   * call, and React's own development logging would loop.
+   */
+  const handleSandboxLog = useCallback((entry: SandboxLogEntry) => {
+    const next: ConsoleEntry = {
+      id: ++consoleIdRef.current,
+      level: entry.level,
+      text: entry.text,
+    };
+
+    pendingLogsRef.current.push(next);
+
+    if (flushTimerRef.current !== null) return;
+
+    flushTimerRef.current = setTimeout(() => {
+      flushTimerRef.current = null;
+      const pending = pendingLogsRef.current;
+      if (pending.length === 0) return;
+      pendingLogsRef.current = [];
+      setConsoleEntries((prev) => [...prev, ...pending].slice(-200));
+    }, 120);
+  }, []);
+
+  const handleSandboxError = useCallback((error: SandboxErrorReport) => {
+    setRuntimeError(error);
+    setStatus("error");
+  }, []);
+
+  const handleSandboxRendered = useCallback(() => {
+    setRuntimeError(null);
+    setStatus("ok");
   }, []);
 
   function handleChange(next: string) {
@@ -343,44 +282,47 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
               </span>
             </div>
 
-            <div className="scrollbar-slim min-h-0 flex-1 overflow-auto p-5 sm:p-6">
+            <div className="relative min-h-0 flex-1">
               {hasNoComponent ? (
-                <p className="text-sm leading-7 text-[var(--text-muted)]">
-                  ဒီဖိုင်ထဲမှာ component မရှိသေးပါ — code အားလုံး comment အဖြစ်
-                  ရှိနေပါတယ်။ အောက်က editor မှာ code ကို ဖြည့်ပြီး စမ်းကြည့်ပါ။
-                </p>
-              ) : compileError ? (
-                <div
-                  role="alert"
-                  className="flex flex-col gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <span aria-hidden="true">⚠</span>
-                    <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
-                      Compile မအောင်မြင်ပါ
-                    </p>
-                  </div>
-                  <pre className="scrollbar-slim max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--surface-sunken)] p-3 font-mono text-xs leading-6 text-[var(--text-strong)]">
-                    {compileError}
-                  </pre>
+                <div className="h-full overflow-auto p-5 sm:p-6">
+                  <p className="text-sm leading-7 text-[var(--text-muted)]">
+                    ဒီဖိုင်ထဲမှာ component မရှိသေးပါ — code အားလုံး comment အဖြစ်
+                    ရှိနေပါတယ်။ အောက်က editor မှာ code ကို ဖြည့်ပြီး စမ်းကြည့်ပါ။
+                  </p>
                 </div>
               ) : (
-                <PlaygroundErrorBoundary
-                  key={`${activeName}:${resolved?.version ?? 0}`}
-                >
-                  {resolved ? (
-                    <ComponentPreview
-                      Component={resolved.component}
-                      props={props}
-                      version={resolved.version}
-                    />
-                  ) : (
-                    <p className="text-sm leading-7 text-[var(--text-muted)]">
-                      {status === "compiling"
-                        ? "Compile လုပ်နေပါတယ်…"
-                        : "Preview ပြောင်းပါ…"}
-                    </p>
-                  )}
+                <PlaygroundErrorBoundary>
+                  <PlaygroundPreview
+                    code={compiledCode}
+                    component={componentName}
+                    props={props}
+                    theme={resolvedTheme}
+                    onLog={handleSandboxLog}
+                    onError={handleSandboxError}
+                    onRendered={handleSandboxRendered}
+                  />
+
+                  {/* Compile and runtime problems are shown over the preview. */}
+                  {compileError || runtimeError ? (
+                    <div className="pointer-events-none absolute inset-0 overflow-auto p-5 sm:p-6">
+                      <div
+                        role="alert"
+                        className="flex flex-col gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span aria-hidden="true">⚠</span>
+                          <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
+                            {compileError
+                              ? "Compile မအောင်မြင်ပါ"
+                              : "Runtime error ဖြစ်ပါတယ်"}
+                          </p>
+                        </div>
+                        <pre className="scrollbar-slim max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--surface-sunken)] p-3 font-mono text-xs leading-6 text-[var(--text-strong)]">
+                          {compileError ?? runtimeError?.message}
+                        </pre>
+                      </div>
+                    </div>
+                  ) : null}
                 </PlaygroundErrorBoundary>
               )}
             </div>
@@ -397,24 +339,4 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
       </section>
     </div>
   );
-}
-
-/**
- * Renders the resolved component with the props from the registry.
- *
- * The component is handed over as a prop (rather than read from state)
- * so that a new component always produces a new element instead of
- * reusing a stale one. `version` is a `key` so React remounts the
- * component when the learner compiles a new version of the file.
- */
-function ComponentPreview({
-  Component,
-  props,
-  version,
-}: {
-  Component: ComponentType;
-  props: Record<string, unknown>;
-  version: number;
-}) {
-  return <Component key={version} {...props} />;
 }

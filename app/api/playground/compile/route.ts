@@ -41,6 +41,38 @@ function declaresComponent(source: string, name: string): boolean {
   ).test(source);
 }
 
+/**
+ * Matches an explicit export of the component, e.g.
+ * `export function UserList` or `export { UserList }`.
+ */
+function exportsComponent(source: string, name: string): boolean {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  const patterns = [
+    new RegExp(
+      `(?:^|\\n)\\s*export\\s+(?:default\\s+)?(?:async\\s+)?(?:function|class|const|let|var)\\s+${escaped}\\b`,
+    ),
+    new RegExp(
+      `(?:^|\\n)\\s*export\\s*\\{[^}]*\\b${escaped}\\b[^}]*\\}`,
+    ),
+  ];
+
+  return patterns.some((pattern) => pattern.test(source));
+}
+
+/**
+ * Appends an explicit re-export of the wanted component.
+ *
+ * Sucrase's `imports` transform turns `export default Foo` into
+ * `exports.default = Foo`, but a component that is only *declared* (never
+ * exported) stays a local binding. The sandbox looks the component up on
+ * the module's exports, so the compiled module is given an extra line
+ * that assigns the local binding to `exports.__target`.
+ */
+function appendTargetExport(code: string, name: string): string {
+  return `${code}\n;exports.__target = ${name};`;
+}
+
 export async function POST(request: Request): Promise<Response> {
   let payload: CompileRequest;
 
@@ -71,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
   // The learner's practice files often declare their component without
   // exporting it. When the requested component is missing we append a
   // re-export so the client can still reach it.
-  let source = payload.source;
+  const source = payload.source;
   if (wanted !== "default" && !declaresComponent(source, wanted)) {
     return Response.json(
       {
@@ -89,7 +121,16 @@ export async function POST(request: Request): Promise<Response> {
       filePath: fileName,
     });
 
-    return Response.json({ ok: true, code } satisfies CompileResponse);
+    // The component is only re-exported when the file does not export it
+    // itself. Sucrase's `imports` transform has already turned any real
+    // `export` statement into an assignment on `exports`, so a file that
+    // exports the component does not need the extra line.
+    const finalCode =
+      wanted !== "default" && !exportsComponent(source, wanted)
+        ? appendTargetExport(code, wanted)
+        : code;
+
+    return Response.json({ ok: true, code: finalCode } satisfies CompileResponse);
   } catch (error) {
     const err = error as Error;
     return Response.json(
