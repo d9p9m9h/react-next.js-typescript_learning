@@ -1,7 +1,7 @@
 # React Code Playground
 
-A **localhost-only** React + TypeScript code playground. Edit a `.tsx` practice file on the left
-and see the component render live on the right, with console output and inline errors.
+A **localhost-only** React + TypeScript code playground. Edit a `.tsx` practice file, switch to the
+preview, and see the component render live — with console output and inline errors.
 
 This is a personal learning tool. It is not deployed publicly, and the dev server is bound to
 `127.0.0.1` so it is not reachable from the network.
@@ -26,10 +26,21 @@ Then open <http://127.0.0.1:3000>.
 | `npx next build`    | Production build                                 |
 | `npx next start`    | Serves the production build                      |
 
+## The workspace
+
+The page has three parts: a **file tablist**, a **panel** and a **console**.
+
+The editor and the preview take turns — only one of them is on screen at a time. Use the
+**Code / Preview** switch above the panel to move between them. The console is always visible at
+the bottom, so `console.log(...)` output stays in view while you edit.
+
+When a compile or runtime error happens, a compact error strip appears above the editor with a
+**Details** button that jumps straight to the preview, where the full message is shown.
+
 ## How it works
 
-1. **Discovery** — `lib/playground/files.ts` uses Turbopack's `import.meta.glob("/*.tsx", { query: "?raw" })`
-   to read the raw source of every root-level `.tsx` file. The `?raw` rule lives in `next.config.ts`.
+1. **Discovery** — `lib/playground/files.ts` uses Turbopack's `import.meta.glob("/practice/*.tsx", { query: "?raw" })`
+   to read the raw source of every practice file. The `?raw` rule lives in `next.config.ts`.
 2. **Compile** — `POST /api/playground/compile` runs Sucrase on the server and returns a CommonJS module.
 3. **Preview** — `components/playground/playground-preview.tsx` posts that module into a sandboxed
    iframe (`/playground/sandbox`) which evaluates and renders it.
@@ -40,7 +51,7 @@ The learner's code is **never** evaluated in the main application window.
 
 ## Practice files
 
-The eight root-level `.tsx` files are the playground's content. The app never writes to them.
+The eight `.tsx` files in `practice/` are the playground's content. The app never writes to them.
 
 `P2L3.tsx` · `P2L4.tsx` · `p2l5.tsx` · `p2l6.tsx` · `p2l7.tsx` · `index.tsx` ·
 `event_handler.tsx` · `explicit_syntax.tsx`

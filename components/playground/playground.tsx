@@ -10,12 +10,16 @@ import {
   type SandboxErrorReport,
   type SandboxLogEntry,
 } from "@/components/playground/playground-preview";
+import {
+  PlaygroundViewToggle,
+  type PlaygroundView,
+} from "@/components/playground/playground-view-toggle";
 import { useTheme } from "@/components/theme-provider";
 import type { PlaygroundFile } from "@/lib/playground/files";
 import { playgroundTargets } from "@/lib/playground/registry";
 
 type PlaygroundProps = {
-  /** Every root-level `.tsx` file found in the project. */
+  /** Every `.tsx` file found in the `practice/` folder. */
   files: PlaygroundFile[];
   /** The file that should be open when the playground first renders. */
   initialFile: string;
@@ -46,6 +50,15 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
   );
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
   const [compiledCode, setCompiledCode] = useState<string | null>(null);
+  /**
+   * Which panel is on screen.
+   *
+   * The editor and the preview take turns: the other one is hidden with
+   * `display: none` (not unmounted), so the editor keeps its cursor
+   * position and the sandbox keeps its rendered result when the learner
+   * switches back and forth.
+   */
+  const [view, setView] = useState<PlaygroundView>("code");
 
   // Guards against a slow compile response overwriting a newer one.
   const requestIdRef = useRef(0);
@@ -239,51 +252,65 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/* File selector */}
-      <div
-        role="tablist"
-        aria-label="Playground files"
-        className="scrollbar-slim -mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-1"
-      >
-        {files.map((file) => {
-          const isActive = file.name === activeName;
-          const info = playgroundTargets[file.name];
+      {/* File selector + the Code / Preview switch */}
+      <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <div
+          role="tablist"
+          aria-label="Playground files"
+          className="scrollbar-slim -mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1"
+        >
+          {files.map((file) => {
+            const isActive = file.name === activeName;
+            const info = playgroundTargets[file.name];
 
-          return (
-            <button
-              key={file.name}
-              ref={(node) => {
-                tabRefs.current[file.name] = node;
-              }}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => setActiveName(file.name)}
-              onKeyDown={handleTabKeyDown}
-              className={[
-                "flex shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
-                isActive
-                  ? "border-[var(--highlight)] bg-[var(--highlight)]/10 text-[var(--highlight)]"
-                  : "border-[var(--surface-border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:border-[var(--surface-border-strong)] hover:text-[var(--text-strong)]",
-              ].join(" ")}
-            >
-              <span className="font-mono text-xs font-semibold">
-                {file.name}
-              </span>
-              {info?.label ? (
-                <span className="hidden rounded-md bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-subtle)] sm:inline">
-                  {info.label}
+            return (
+              <button
+                key={file.name}
+                ref={(node) => {
+                  tabRefs.current[file.name] = node;
+                }}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setActiveName(file.name)}
+                onKeyDown={handleTabKeyDown}
+                className={[
+                  "flex shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+                  isActive
+                    ? "border-[var(--highlight)] bg-[var(--highlight)]/10 text-[var(--highlight)]"
+                    : "border-[var(--surface-border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:border-[var(--surface-border-strong)] hover:text-[var(--text-strong)]",
+                ].join(" ")}
+              >
+                <span className="font-mono text-xs font-semibold">
+                  {file.name}
                 </span>
-              ) : null}
-            </button>
-          );
-        })}
+                {info?.label ? (
+                  <span className="hidden rounded-md bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-subtle)] sm:inline">
+                    {info.label}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <PlaygroundViewToggle value={view} onChange={setView} />
       </div>
 
-      {/* Editor + preview */}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
-        <section className="flex min-h-[380px] min-w-0 flex-col lg:min-h-0">
+      {/*
+        Editor and preview.
+
+        Only one of them is on screen at a time — the other one is
+        hidden with `display: none` rather than unmounted, so the
+        editor keeps its cursor position and the sandbox keeps its
+        rendered result when the learner switches back and forth.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <section
+          className="flex min-h-[380px] min-w-0 flex-1 flex-col lg:min-h-0"
+          style={view === "code" ? undefined : { display: "none" }}
+        >
           <h2 className="mb-2 flex shrink-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
             <span
               aria-hidden="true"
@@ -291,6 +318,35 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
             />
             Source · ရေးမယ့် code
           </h2>
+
+          {/*
+            A compact error strip.
+
+            The full error text lives over the preview, but the learner
+            may be looking at the editor, so the problem is announced
+            here too — with a button that jumps straight to the preview.
+          */}
+          {compileError || runtimeError ? (
+            <div
+              role="alert"
+              className="mb-2 flex shrink-0 items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2"
+            >
+              <span aria-hidden="true" className="text-xs">
+                ⚠
+              </span>
+              <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                {compileError ?? runtimeError?.message}
+              </p>
+              <button
+                type="button"
+                onClick={() => setView("preview")}
+                className="shrink-0 rounded-md border border-rose-500/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-700 transition-colors hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] dark:text-rose-300"
+              >
+                Details
+              </button>
+            </div>
+          ) : null}
+
           <div className="min-h-0 min-w-0 flex-1">
             <PlaygroundEditor
               value={source}
@@ -304,7 +360,10 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
           </div>
         </section>
 
-        <section className="flex min-h-[380px] min-w-0 flex-col lg:min-h-0">
+        <section
+          className="flex min-h-[380px] min-w-0 flex-1 flex-col lg:min-h-0"
+          style={view === "preview" ? undefined : { display: "none" }}
+        >
           <h2 className="mb-2 flex shrink-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
             <span
               aria-hidden="true"
@@ -350,7 +409,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
                 <div className="h-full overflow-auto p-5 sm:p-6">
                   <p className="text-sm leading-7 text-[var(--text-muted)]">
                     ဒီဖိုင်ထဲမှာ component မရှိသေးပါ — code အားလုံး comment အဖြစ်
-                    ရှိနေပါတယ်။ အောက်က editor မှာ code ကို ဖြည့်ပြီး စမ်းကြည့်ပါ။
+                    ရှိနေပါတယ်။ Code ဘက်မှာ code ကို ဖြည့်ပြီး စမ်းကြည့်ပါ။
                   </p>
                 </div>
               ) : (

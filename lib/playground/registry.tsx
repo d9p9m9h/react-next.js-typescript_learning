@@ -1,8 +1,8 @@
 /**
  * Which component inside each playground file should be rendered.
  *
- * The learner's root-level `.tsx` files are practice files: most of them
- * export a component, but some only define one locally (`index.tsx`,
+ * The learner's `.tsx` files in `practice/` are practice files: most of
+ * them export a component, but some only define one locally (`index.tsx`,
  * `P2L4.tsx`, `explicit_syntax.tsx`, `event_handler.tsx`).
  *
  * The learner's own files are never modified. Instead the playground keeps
@@ -19,7 +19,8 @@ export type PlaygroundTarget = {
 };
 
 /**
- * Keys are the exact file name as it appears on disk.
+ * Keys are the exact file name as it appears on disk (e.g. `P2L3.tsx`),
+ * without the `practice/` folder prefix.
  *
  * The registry is deliberately explicit so the learner can see, in one
  * place, which component each practice file is expected to show.
