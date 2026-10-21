@@ -1,7 +1,7 @@
 "use client";
 
-/** Which of the two panels the playground is currently showing. */
-export type PlaygroundView = "code" | "preview";
+/** Which editor and preview panels the playground is currently showing. */
+export type PlaygroundView = "split" | "code" | "preview";
 
 type PlaygroundViewToggleProps = {
   /** The panel that is currently visible. */
@@ -10,19 +10,19 @@ type PlaygroundViewToggleProps = {
   onChange: (view: PlaygroundView) => void;
 };
 
-const OPTIONS: { value: PlaygroundView; label: string; icon: string }[] = [
+const OPTIONS: {
+  value: PlaygroundView;
+  label: string;
+  icon: string;
+  desktopOnly?: boolean;
+}[] = [
+  { value: "split", label: "Split", icon: "◫", desktopOnly: true },
   { value: "code", label: "Code", icon: "⌨" },
   { value: "preview", label: "Preview", icon: "▷" },
 ];
 
 /**
- * Switches between the code editor and the live preview.
- *
- * The playground shows **one** panel at a time: the editor and the
- * preview take turns instead of sitting side by side. On a narrow
- * screen there is not enough room for two columns anyway, and on a wide
- * screen a single full-width panel is much easier to read and to type
- * into.
+ * Switches between the editor, the live preview, and a side-by-side view.
  */
 export function PlaygroundViewToggle({
   value,
@@ -31,7 +31,7 @@ export function PlaygroundViewToggle({
   return (
     <div
       role="group"
-      aria-label="Code နဲ့ Preview ပြန်ချင်းပြောင်းမယ်"
+      aria-label="Code နဲ့ Preview မြင်ကွင်းရွေးမယ်"
       className="flex shrink-0 items-center gap-1 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-sunken)] p-1"
     >
       {OPTIONS.map((option) => {
@@ -43,9 +43,14 @@ export function PlaygroundViewToggle({
             type="button"
             onClick={() => onChange(option.value)}
             aria-pressed={isActive}
-            title={`${option.label} ကို ပြမယ်`}
+            title={
+              option.value === "split"
+                ? "Code နဲ့ Preview ကို ဘေးချင်းယှဉ်ပြမယ်"
+                : `${option.label} ကို ပြမယ်`
+            }
             className={[
-              "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+              "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+              option.desktopOnly ? "hidden lg:flex" : "",
               isActive
                 ? "bg-[var(--surface-raised)] text-[var(--accent)] shadow-sm"
                 : "text-[var(--text-subtle)] hover:text-[var(--text-strong)]",

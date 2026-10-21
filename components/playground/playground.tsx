@@ -61,8 +61,9 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
    */
   const [view, setView] = useState<PlaygroundView>("code");
 
-  // Guards against a slow compile response overwriting a newer one.
+  // Prevents a stale compile response from replacing newer editor contents.
   const requestIdRef = useRef(0);
+  const compileControllerRef = useRef<AbortController | null>(null);
   const consoleIdRef = useRef(0);
   /** Console entries waiting to be flushed into React state. */
   const pendingLogsRef = useRef<ConsoleEntry[]>([]);
@@ -88,16 +89,17 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
   const hasNoComponent = componentName === "none";
 
   const run = useCallback(
-    async (fileName: string, code: string) => {
-      const id = ++requestIdRef.current;
-      setStatus("compiling");
-      setCompileError(null);
-      setRuntimeError(null);
-
+    async (
+      fileName: string,
+      code: string,
+      requestId: number,
+      signal: AbortSignal,
+    ) => {
       try {
         const response = await fetch("/api/playground/compile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal,
           body: JSON.stringify({
             fileName,
             source: code,
@@ -112,7 +114,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
           error?: string;
         };
 
-        if (id !== requestIdRef.current) return;
+        if (requestId !== requestIdRef.current) return;
 
         if (!result.ok || !result.code || !result.css) {
           setStatus("error");
@@ -125,10 +127,14 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
         setCompiledCode(result.code);
         setCompiledCss(result.css);
         setStatus("ok");
-      } catch {
-        if (id !== requestIdRef.current) return;
+      } catch (error) {
+        if (signal.aborted || requestId !== requestIdRef.current) return;
         setStatus("error");
-        setCompileError("Compile API ကို မေးနိုင်ခဲ့ပါ။ Server ကို စစ်ပါ။");
+        setCompileError(
+          error instanceof Error
+            ? `Compile API ကို မေးနိုင်ခဲ့ပါ။ ${error.message}`
+            : "Compile API ကို မေးနိုင်ခဲ့ပါ။ Server ကို စစ်ပါ။",
+        );
         setCompiledCode(null);
         setCompiledCss(null);
       }
@@ -136,16 +142,26 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
     [componentName],
   );
 
-  // Compile whenever the active file, its source, or the wanted component
-  // changes. The 400 ms delay keeps typing from firing a request per key.
+  // Compile edits promptly and cancel any request for an older source.
   useEffect(() => {
     if (!activeFile || hasNoComponent) return;
 
-    const timer = setTimeout(() => {
-      void run(activeFile.name, source);
-    }, 400);
+    const requestId = ++requestIdRef.current;
+    compileControllerRef.current?.abort();
+    setStatus("compiling");
+    setCompileError(null);
+    setRuntimeError(null);
 
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => {
+      const controller = new AbortController();
+      compileControllerRef.current = controller;
+      void run(activeFile.name, source, requestId, controller.signal);
+    }, 180);
+
+    return () => {
+      clearTimeout(timer);
+      compileControllerRef.current?.abort();
+    };
   }, [activeFile, source, run, hasNoComponent]);
 
   // Clear the preview when the active file has nothing to render.
@@ -199,7 +215,6 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
 
   const handleSandboxRendered = useCallback(() => {
     setRuntimeError(null);
-    setStatus("ok");
   }, []);
 
   function handleChange(next: string) {
@@ -258,7 +273,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/* File selector + the Code / Preview switch */}
+      {/* File selector + the editor / preview layout controls */}
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div
           role="tablist"
@@ -304,18 +319,18 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
         <PlaygroundViewToggle value={view} onChange={setView} />
       </div>
 
-      {/*
-        Editor and preview.
-
-        Only one of them is on screen at a time — the other one is
-        hidden with `display: none` rather than unmounted, so the
-        editor keeps its cursor position and the sandbox keeps its
-        rendered result when the learner switches back and forth.
-      */}
-      <div className="flex min-h-0 flex-1 flex-col">
+      {/* Keep both panels mounted so switching views preserves editor and preview state. */}
+      <div
+        className={[
+          "grid min-h-[320px] min-w-0 flex-1 grid-cols-1 gap-3 lg:min-h-0 lg:gap-4",
+          view === "split" ? "lg:grid-cols-2" : "lg:grid-cols-1",
+        ].join(" ")}
+      >
         <section
-          className="flex min-h-[380px] min-w-0 flex-1 flex-col lg:min-h-0"
-          style={view === "code" ? undefined : { display: "none" }}
+          className={[
+            "min-h-[320px] min-w-0 flex-col lg:min-h-0",
+            view === "code" || view === "split" ? "flex" : "hidden",
+          ].join(" ")}
         >
           <h2 className="mb-2 flex shrink-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
             <span
@@ -367,8 +382,14 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
         </section>
 
         <section
-          className="flex min-h-[380px] min-w-0 flex-1 flex-col lg:min-h-0"
-          style={view === "preview" ? undefined : { display: "none" }}
+          className={[
+            "min-h-[320px] min-w-0 flex-col lg:min-h-0",
+            view === "preview"
+              ? "flex"
+              : view === "split"
+                ? "hidden lg:flex"
+                : "hidden",
+          ].join(" ")}
         >
           <h2 className="mb-2 flex shrink-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
             <span
@@ -460,7 +481,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
       </div>
 
       {/* Console */}
-      <section className="flex h-40 min-w-0 shrink-0 flex-col">
+      <section className="flex h-28 min-w-0 shrink-0 flex-col sm:h-32">
         <PlaygroundConsole
           entries={consoleEntries}
           onClear={() => setConsoleEntries([])}

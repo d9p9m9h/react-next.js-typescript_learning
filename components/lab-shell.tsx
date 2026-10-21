@@ -14,7 +14,7 @@ import { LabHeader } from "@/components/lab-header";
  */
 export function LabShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--surface-base)]">
+    <div className="flex min-h-svh flex-col bg-[var(--surface-base)]">
       <LabHeader />
 
       <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-3 py-3 sm:px-6 sm:py-4 lg:min-h-0 lg:px-8">

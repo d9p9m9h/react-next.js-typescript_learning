@@ -15,6 +15,7 @@
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-10-21 | **STEP 5** — practice files moved from the project root into `practice/`; the editor and the preview now take turns via a **Code / Preview** switch (one panel at a time). |
 | 2026-10-22 | Preview styles are compiled from the current TSX source with Tailwind CSS v4 and injected into the sandboxed iframe. |
+| 2026-10-22 | Added responsive Split / Code / Preview modes, cancelled stale live-compile requests, and tightened the workspace layout. |
 
 ---
 
@@ -52,7 +53,7 @@ code pane. **All of that has been removed.** The application is now one screen:
 │ R  React Code Playground                    ☀   ☾   ⌘    │  header + theme switch
 ├──────────────────────────────────────────────────────────┤
 │ [P2L3] [P2L4] [index] [p2l5] [p2l6] [p2l7] [index] …    │  file selector
-│                                       [⌨ Code] [▷ Preview]│  view switch
+│                          [◫ Split] [⌨ Code] [▷ Preview]  │  view switch
 ├──────────────────────────────────────────────────────────┤
 │ Source · ရေးမယ့် code      (or)      Preview · ရလဒ်    │
 │ ┌───────────────────────┐   ┌──────────────────────────┐ │
@@ -74,8 +75,8 @@ preview.
 | Concern        | How it is handled now                                               |
 | -------------- | ------------------------------------------------------------------- |
 | File selection | A `tablist` of every `.tsx` file in `practice/`, keyboard-navigable |
-| Editing        | A plain `<textarea>`; changes are debounced 400 ms, then compiled   |
-| View switch    | A **Code / Preview** toggle — only one panel is on screen at a time |
+| Editing        | A plain `<textarea>`; changes are debounced 180 ms, then compiled  |
+| View switch    | **Split / Code / Preview** — side-by-side on desktop, one panel on mobile |
 | Preview        | A sandboxed iframe running the compiled module                      |
 | Console        | `console.*` calls are forwarded from the iframe and shown here      |
 | Errors         | Compile errors and runtime errors are shown inline over the preview |
@@ -135,7 +136,7 @@ RootLayout (app/layout.tsx) — server
             └── {children} = app/page.tsx
                 └── Playground (client)          components/playground/playground.tsx
                     ├── file tablist
-                    ├── PlaygroundViewToggle     ← Code / Preview switch
+                    ├── PlaygroundViewToggle     ← Split / Code / Preview switch
                     ├── PlaygroundEditor         ← <textarea> + Reset + status
                     ├── PlaygroundPreview        ← <iframe> + postMessage bridge
                     │   └── (sandbox frame)      ← app/playground/sandbox
@@ -355,7 +356,7 @@ frame-ancestors 'self'
 | `components/theme-provider.tsx`                       | Theme state, `localStorage` key `react-lab-theme`, follows the OS when set to `system`.                |
 | `components/storage-cleanup.tsx`                      | Deletes the orphaned `react-lab-progress` key once on mount.                                           |
 | `components/playground/playground.tsx`                | The workspace: file tabs, view switch, editor, preview, console; owns the compile debounce.            |
-| `components/playground/playground-view-toggle.tsx`    | The **Code / Preview** switch — one panel at a time.                                                   |
+| `components/playground/playground-view-toggle.tsx`    | The **Split / Code / Preview** view controls.                                                           |
 | `components/playground/playground-editor.tsx`         | `<textarea>` editor with Tab-insert, status label and Reset button.                                    |
 | `components/playground/playground-preview.tsx`        | The `<iframe>` and the `postMessage` bridge; validates the source and token.                           |
 | `components/playground/playground-console.tsx`        | Renders captured log lines.                                                                            |
@@ -401,7 +402,7 @@ The `<textarea>` keeps `outline-none` (so the caret is not doubled), but its scr
 | `components/theme-toggle.tsx`                         | 54    | Theme switch            |
 | `components/storage-cleanup.tsx`                      | 17    | Obsolete-key cleanup    |
 | `components/playground/playground.tsx`                | 424   | The workspace           |
-| `components/playground/playground-view-toggle.tsx`    | 58    | Code / Preview switch   |
+| `components/playground/playground-view-toggle.tsx`    | 65    | Split / Code / Preview switch |
 | `components/playground/playground-editor.tsx`         | 153   | Editor + Reset          |
 | `components/playground/playground-preview.tsx`        | 225   | Iframe + message bridge |
 | `components/playground/playground-console.tsx`        | 75    | Console panel           |
@@ -483,18 +484,20 @@ The Emerald/Gold palette is preserved from the earlier design work.
 (`--font-mono-code`) and Noto Sans Myanmar (`--font-myanmar`, subsets `["myanmar", "latin"]`), so
 Burmese text renders correctly.
 
-**Layout** (measured in a real browser, 2026-10-21, after the single-panel change):
+**Layout** (original measurements from 2026-10-21, before Split mode):
 
 | Viewport   | Result                                                                                                            |
 | ---------- | ----------------------------------------------------------------------------------------------------------------- |
 | 1440 × 900 | **One** panel fills the width (579 px) + console (160 px). `scrollHeight === 900` — the page does **not** scroll. |
 | 390 × 844  | The visible panel is 492 px + console 160 px. No horizontal overflow.                                             |
 
-The other panel is hidden with `display: none` — it is **not** unmounted, so the editor keeps its
-cursor position and the sandbox keeps its rendered result when the learner switches back and forth.
+The updated Split / Code / Preview layout has not yet been measured in a browser.
 
-The breakpoint is `lg`. Below it the visible panel carries `min-h-[380px]` so it stays usable; on
-large screens `lg:min-h-0` lets it fill the viewport.
+In Split mode, both panels are visible side by side on desktop and the editor remains visible on
+small screens; Code and Preview modes show just the selected panel. Hidden panels remain mounted,
+so the editor keeps its cursor position and the sandbox keeps its rendered result when switching.
+The breakpoint is `lg`; panels have a 320 px minimum height on small screens and fill the available
+workspace height on desktop.
 
 ### 10.1 The height chain — why `h-full` collapses the editor
 
@@ -530,11 +533,11 @@ heights entirely.
 The `min-h-0` on every level is what allows a flex item to shrink below its content height —
 without it, the textarea's content would push the panel open and the page would scroll again.
 
-### 10.2 The Code / Preview switch
+### 10.2 The Split / Code / Preview switch
 
-`components/playground/playground-view-toggle.tsx` is a two-button group (`⌨ Code` / `▷ Preview`)
-with `aria-pressed` on the active one. It sits next to the file tablist and is the only thing that
-decides which panel is on screen.
+`components/playground/playground-view-toggle.tsx` offers `◫ Split`, `⌨ Code` and `▷ Preview`
+buttons with `aria-pressed` on the active one. Split is available on desktop; on smaller screens,
+Code and Preview remain as single-panel views.
 
 One deliberate addition: when a compile or runtime error occurs, a **compact error strip** appears
 above the editor (`role="alert"`, truncated message, a **Details** button). The full error text
@@ -558,6 +561,11 @@ All results below were **actually run and observed** on 2026-10-21.
 `practice/p2l8.tsx` confirmed its light/dark utilities plus new unsaved utilities produce CSS.
 The production build could not be re-verified in this sandbox: Turbopack's CSS worker exited before
 the build process could connect to it.
+
+**Layout follow-up on 2026-10-22:** `npm run typecheck` passed after adding Split / Code / Preview
+views and cancelling superseded compile requests. Visual browser verification was unavailable
+because the local dev server could not be reached by the integrated browser; `next build` remains
+blocked by the same Turbopack CSS-worker startup failure.
 
 Build output route table:
 
@@ -587,9 +595,9 @@ Route (app)
 | 11  | Every practice file renders                              | ✅ see the table below                                                                                                        |
 | 12  | Removed lesson routes are gone                           | ✅ `/lesson/jsx-rendering` → **404**                                                                                          |
 | 13  | Dev server binding                                       | ✅ listening socket is `127.0.0.1:3000` only                                                                                  |
-| 14  | **Code / Preview switch**                                | ✅ only one panel is visible at a time (`display: none` on the other); the switch updates `aria-pressed`                      |
+| 14  | **Code / Preview switch**                                | ✅ on narrow screens only one panel is visible; the switch updates `aria-pressed`                                              |
 | 15  | **Error strip in Code view**                             | ✅ `role="alert"` above the editor; the **Details** button switches to the preview                                            |
-| 16  | **Switching back and forth**                             | ✅ the editor keeps its content and the sandbox keeps its rendered result (panels are hidden, not unmounted)                  |
+| 16  | **Switching views**                                      | ✅ the editor keeps its content and the sandbox keeps its rendered result (panels are hidden, not unmounted)                  |
 | 17  | **The editor fills its panel**                           | ✅ textarea 315 px (≈ 13 lines) instead of 74 px (≈ 2 lines)                                                                  |
 | 18  | **The preview fills its panel**                          | ✅ iframe 319 px = the height of its box, instead of 150 px                                                                   |
 | 19  | **No percentage heights left in the height path**        | ✅ verified by measuring the computed height of every box in the chain                                                        |
@@ -645,8 +653,8 @@ the lesson-cleanup step.
 | The `?raw` Turbopack rule still applies            | ✅ the rule glob `"*.tsx"` has no `/`, so Turbopack matches it against the **file name** |
 | Every practice file still renders                  | ✅ all 8 verified in a real browser (table in §11.2)                                     |
 | The registry still resolves each file              | ✅ keys are file names only; the `practice/` prefix is stripped by `toFileName()`        |
-| Only one panel is on screen                        | ✅ the other section computes to `display: none`; the visible one is `flex`              |
-| The switch updates `aria-pressed`                  | ✅ `Code` / `Preview` buttons report the active view                                     |
+| Only one panel is on screen                        | ✅ original Code / Preview mode hides the other section                                |
+| The switch updates `aria-pressed`                  | ✅ original Code / Preview buttons report the active view                               |
 | The page still does not scroll on desktop          | ✅ `scrollHeight === innerHeight === 900`                                                |
 | No horizontal overflow on desktop or mobile        | ✅ checked at 1440 × 900 and 390 × 844                                                   |
 | The error is visible while the editor is on screen | ✅ a compact `role="alert"` strip sits above the editor, with a **Details** button       |
@@ -668,8 +676,8 @@ the lesson-cleanup step.
 | 7   | Next.js logs a "font was preloaded but not used" warning                                     | Cosmetic; caused by `next/font` preloading the Myanmar/Inter subsets           |
 | 8   | There is no ESLint configuration                                                             | `npx next lint` is not valid in Next 16                                        |
 | 9   | `import.meta.glob` is Turbopack-only                                                         | The project cannot be built with webpack                                       |
-| 10  | The editor and the preview cannot be seen at the same time                                   | By design — use the **Code / Preview** switch to move between them             |
-| 11  | The compile request is sent on every keystroke (debounced 400 ms)                            | The preview lags slightly behind very fast typing                              |
+| 10  | Split mode shows the editor and preview together only on desktop                             | On small screens, use the **Code / Preview** views to preserve usable space     |
+| 11  | The compile request is sent after typing pauses (debounced 180 ms)                           | Very fast typing still waits briefly before recompiling                        |
 | 12  | The editor's scrollbar belongs to the `<textarea>`, not the panel                            | Cosmetic; the panel keeps its rounded border and focus ring                    |
 
 ---
@@ -730,7 +738,7 @@ checks `event.source === iframe.contentWindow`.
 | Term              | Meaning                                                                      |
 | ----------------- | ---------------------------------------------------------------------------- |
 | **Practice file** | A `.tsx` file in `practice/` the learner edits. Never written to by the app. |
-| **View switch**   | The Code / Preview toggle. Only one panel is on screen at a time.            |
+| **View switch**   | The Split / Code / Preview toggle. Split is side-by-side on desktop.         |
 | **Sandbox**       | The preview iframe and its document. Opaque origin, strict CSP.              |
 | **Token**         | A random string shared by the app and the sandbox; authenticates messages.   |
 | **Vendor bundle** | React's CommonJS builds wrapped in a tiny `require` registry.                |
