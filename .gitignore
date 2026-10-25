@@ -29,3 +29,9 @@ Thumbs.db
 
 # Project-specific
 Burmese Prompt Template.md
+
+# Test coverage
+coverage/
+
+# Turbopack cache
+.turbo/
