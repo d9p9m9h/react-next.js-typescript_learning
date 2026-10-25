@@ -13,10 +13,11 @@ describe("drafts.ts", () => {
       key: vi.fn(),
       length: 0,
     };
-    vi.spyOn(global, "window", "get").mockReturnValue({ localStorage: mockStorage } as any);
+    vi.stubGlobal("window", { localStorage: mockStorage });
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 

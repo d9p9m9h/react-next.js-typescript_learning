@@ -16,7 +16,7 @@
  */
 
 /** Where the drafts live in `localStorage`. */
-const DRAFT_STORAGE_KEY = "react-lab-playground-drafts";
+export const DRAFT_STORAGE_KEY = "react-lab-playground-drafts";
 
 /**
  * The shape stored under the key.
@@ -31,14 +31,21 @@ type StoredDrafts = {
 
 const DRAFT_VERSION = 1;
 
+export { DRAFT_VERSION };
+
 /**
  * Gets the localStorage object, handling both browser and Node.js environments.
  */
-function getStorage(): Storage | null {
-  if (typeof window !== "undefined" && window.localStorage) {
-    return window.localStorage;
+export function getStorage(): Storage | null {
+  // Check for browser environment (globalThis.window)
+  if (typeof globalThis !== "undefined" && globalThis.window && globalThis.window.localStorage) {
+    return globalThis.window.localStorage;
   }
-  // In Node.js test environment, use a mock or return null
+  // Check for test environment (global.window)
+  if (typeof global !== "undefined" && global.window && global.window.localStorage) {
+    return global.window.localStorage;
+  }
+  // In Node.js without test mocks, return null
   return null;
 }
 
