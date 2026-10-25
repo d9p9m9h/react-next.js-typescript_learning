@@ -44,7 +44,7 @@ export type CompileResponse = {
  * Matches a top-level declaration, e.g. `function UserList` or
  * `const UserList = …`.
  */
-function declaresComponent(source: string, name: string): boolean {
+export function declaresComponent(source: string, name: string): boolean {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(
     `(?:^|\\n)\\s*(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?(?:function|class|const|let|var)\\s+${escaped}\\b`,
@@ -55,7 +55,7 @@ function declaresComponent(source: string, name: string): boolean {
  * Matches an explicit export of the component, e.g.
  * `export function UserList` or `export { UserList }`.
  */
-function exportsComponent(source: string, name: string): boolean {
+export function exportsComponent(source: string, name: string): boolean {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   const patterns = [
@@ -79,7 +79,7 @@ function exportsComponent(source: string, name: string): boolean {
  * the module's exports, so the compiled module is given an extra line
  * that assigns the local binding to `exports.__target`.
  */
-function appendTargetExport(code: string, name: string): string {
+export function appendTargetExport(code: string, name: string): string {
   return `${code}\n;exports.__target = ${name};`;
 }
 

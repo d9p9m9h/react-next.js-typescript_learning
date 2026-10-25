@@ -41,8 +41,6 @@ function loadComponents(): void {
     const path = join(componentsFolder, component);
     const source = readFileSync(path, "utf8");
 
-    // eslint-disable-next-line no-new-func -- Prism's components are
-    // plain scripts that expect a `Prism` global.
     const factory = new Function("Prism", "module", "exports", source);
     factory(Prism, { exports: {} }, {});
   }

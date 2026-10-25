@@ -32,14 +32,28 @@ type StoredDrafts = {
 const DRAFT_VERSION = 1;
 
 /**
+ * Gets the localStorage object, handling both browser and Node.js environments.
+ */
+function getStorage(): Storage | null {
+  if (typeof window !== "undefined" && window.localStorage) {
+    return window.localStorage;
+  }
+  // In Node.js test environment, use a mock or return null
+  return null;
+}
+
+/**
  * Reads the stored drafts.
  *
  * A missing, unreadable or malformed payload yields an empty map — the
  * editor then simply starts from the files on disk.
  */
 export function readDrafts(): Record<string, string> {
+  const storage = getStorage();
+  if (!storage) return {};
+
   try {
-    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    const raw = storage.getItem(DRAFT_STORAGE_KEY);
     if (!raw) return {};
 
     const parsed = JSON.parse(raw) as Partial<StoredDrafts>;
@@ -64,8 +78,11 @@ export function readDrafts(): Record<string, string> {
  * Replaces the stored drafts with the given map.
  */
 export function writeDrafts(drafts: Record<string, string>): void {
+  const storage = getStorage();
+  if (!storage) return;
+
   try {
-    window.localStorage.setItem(
+    storage.setItem(
       DRAFT_STORAGE_KEY,
       JSON.stringify({ version: DRAFT_VERSION, drafts } satisfies StoredDrafts),
     );
