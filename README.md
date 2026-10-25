@@ -59,7 +59,7 @@ The learner's code is **never** evaluated in the main application window.
 
 The eight `.tsx` files in `practice/` are the playground's content. The app never writes to them.
 
-`P2L3.tsx` · `P2L4.tsx` · `p2l5.tsx` · `p2l6.tsx` · `p2l7.tsx` · `index.tsx` ·
+`P2L3.tsx` · `P2L4.tsx` · `P2L5.tsx` · `P2L6.tsx` · `P2L7.tsx` · `index.tsx` ·
 `event_handler.tsx` · `explicit_syntax.tsx`
 
 `lib/playground/registry.tsx` decides which component each file previews and which props it gets.

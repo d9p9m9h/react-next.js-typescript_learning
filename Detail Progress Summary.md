@@ -879,6 +879,63 @@ checks `event.source === iframe.contentWindow`.
 
 ---
 
+## 13. Issues 5–7 — playground refactor, naming, and bug fixes (2026-10-26)
+
+### Issue 5 — Extract three hooks from `components/playground/playground.tsx`
+
+`components/playground/playground.tsx` (~700 lines) carried far too much state. Three
+independent concerns were peeled out into dedicated, reusable hooks:
+
+- **`usePlaygroundCompile`** — `components/playground/use-playground-compile.ts`
+  (`usePlaygroundCompile.ts` shim also created).
+  Owns compile-and-preview state (`status`, `compileError`, `runtimeError`,
+  `compiledCode`, `compiledCss`, `highlightedHtml`, `typeDiagnostics`) plus the
+  debounced `/api/playground/compile` fetch, stale-request cancellation via
+  `requestIdRef`/`AbortController`, and the "clear preview when a file has no
+  component" effect. Emits `handleSandboxError` / `handleSandboxRendered`.
+  Retains the 180 ms debounce and the Suspense-free request ordering.
+- **`usePlaygroundConsole`** — `components/playground/use-playground-console.ts`
+  Owns the buffered console entry list, `consoleIdRef`, `pendingLogsRef`, and
+  `flushTimerRef` (120 ms flush timer, 200-line cap), the unmount timer cleanup,
+  and exposes `handleSandboxLog` and `clearConsole`.
+- **`usePlaygroundDrafts`** — `components/playground/use-playground-drafts.ts`
+  Owns the first-mount draft restoration (from `localStorage`) and the reactive
+  re-save effect triggered by `buffers`/`files` changes. `draftsRestoredRef`
+  stays private inside the hook.
+
+`playground.tsx` is now a thin layout component that calls the three hooks and
+hands their values to the `PlaygroundEditor`, `PlaygroundPreview`, and
+`PlaygroundConsole` components. Naming follows both `use-playground-*.ts` and
+`usePlayground*.ts` so both camelCase and kebab-case imports resolve.
+
+### Issue 6 — Rename `p2l5/p2l6/p2l7` → `P2L5/P2L6/P2L7`
+
+Practice files renamed (via `git mv`) to `practice/P2L5.tsx`, `practice/P2L6.tsx`,
+`practice/P2L7.tsx`, matching the existing `P2L3`/`P2L4` convention and the
+sort order from `lib/playground/files.ts` (`localeCompare` with `numeric: true`,
+`sensitivity: "base"`). `lib/playground/registry.tsx` keys updated accordingly.
+`README.md` updated to reflect the new names.
+
+### Issue 7 — `index.tsx` nested `<p>` + `explicit_syntax.tsx` missing return
+
+- **Nested `<p>` bug.** `practice/index.tsx` declared `age: React.ReactElement`
+  and rendered `<p>Age: {age}</p>` with `age = <p>28</p>`, producing a nested
+  `<p>` inside `<p>` (invalid HTML). Fixed by changing the prop type to
+  `age: number` and rewriting the rendered age as plain text. The registry entry
+  for `index.tsx` was updated to `age: 28`, `isOnline: true`.
+- **Missing return.** `practice/explicit_syntax.tsx`’s `ExplicitSyntaxDemo`
+  declared state but had no `return` statement, so it rendered nothing. Added a
+  default JSX return (heading, theme label, item list, and a theme toggle button)
+  tied to the existing `item`/`theme` state.
+
+### Verification
+
+- `npx vitest run` — 4 test files, **48/48 tests pass**.
+- `npx next build` — completes successfully (compiled in ~13.5 s, 6/6 static
+  pages generated). Pre-existing `lib/playground/typecheck.ts` edge-runtime
+  warning (`node:path`) is unchanged and unrelated to these issues.
+
+---
 ## Appendix C — Glossary
 
 | Term              | Meaning                                                                      |
@@ -891,5 +948,6 @@ checks `event.source === iframe.contentWindow`.
 | **Turbopack**     | Next 16's bundler. Provides `import.meta.glob` and the `?raw` rule.          |
 | **Sucrase**       | The TypeScript/JSX transformer used by the compile endpoint.                 |
 | **tsgo**          | The native TypeScript 7 compiler binary; drives the type checker.            |
+| **Draft reset**   | Restores the on-disk source and drops the draft for the active file.         |
 | **Draft**         | An unsaved edit, kept in `localStorage` until it is reset or saved to disk.  |
 | **FOUC**          | Flash of Unstyled Content — prevented by the inline theme boot script.       |

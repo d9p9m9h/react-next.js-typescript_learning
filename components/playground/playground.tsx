@@ -20,8 +20,11 @@ import {
 } from "@/components/playground/playground-view-toggle";
 import { PlaygroundWidthToggle } from "@/components/playground/playground-width-toggle";
 import { useTheme } from "@/components/theme-provider";
-import { readDrafts, removeDraft, writeDrafts } from "@/lib/playground/drafts";
+import { usePlaygroundCompile } from "@/components/playground/use-playground-compile";
+import { usePlaygroundConsole } from "@/components/playground/use-playground-console";
+import { usePlaygroundDrafts } from "@/components/playground/use-playground-drafts";
 import type { PlaygroundFile } from "@/lib/playground/files";
+import { removeDraft } from "@/lib/playground/drafts";
 import { playgroundTargets } from "@/lib/playground/registry";
 import type { TypeDiagnostic } from "@/lib/playground/typecheck";
 
@@ -50,18 +53,8 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
   const [buffers, setBuffers] = useState<Record<string, string>>(() =>
     Object.fromEntries(files.map((file) => [file.name, file.source])),
   );
-  const [status, setStatus] = useState<Status>("idle");
-  const [compileError, setCompileError] = useState<string | null>(null);
-  const [runtimeError, setRuntimeError] = useState<SandboxErrorReport | null>(
-    null,
-  );
-  const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
-  const [compiledCode, setCompiledCode] = useState<string | null>(null);
-  const [compiledCss, setCompiledCss] = useState<string | null>(null);
-  /** The highlighted source, as HTML, for the code pane. */
-  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
-  /** The type errors found in the current source. */
-  const [typeDiagnostics, setTypeDiagnostics] = useState<TypeDiagnostic[]>([]);
+  /** Compile/preview state is provided by usePlaygroundCompile. */
+  /** State for the extracted compile / console hooks is provided below. */
   /**
    * Which panel is on screen.
    *
@@ -90,14 +83,6 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
     Record<string, EditablePropValue>
   >({});
 
-  // Prevents a stale compile response from replacing newer editor contents.
-  const requestIdRef = useRef(0);
-  const compileControllerRef = useRef<AbortController | null>(null);
-  const consoleIdRef = useRef(0);
-  /** Console entries waiting to be flushed into React state. */
-  const pendingLogsRef = useRef<ConsoleEntry[]>([]);
-  /** The pending flush timer for buffered console entries. */
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The tab buttons, so keyboard navigation can move the focus. */
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -106,61 +91,20 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
     [files, activeName],
   );
 
-  /**
-   * Restores the saved drafts on the first mount.
-   *
-   * The drafts live in `localStorage`, so they are only available on
-   * the client. They are applied in an effect (not in the state
-   * initialiser) so the server-rendered markup and the first client
-   * render agree.
-   */
-  const draftsRestoredRef = useRef(false);
-
-  useEffect(() => {
-    if (draftsRestoredRef.current) return;
-    draftsRestoredRef.current = true;
-
-    const drafts = readDrafts();
-    if (Object.keys(drafts).length === 0) return;
-
-    setBuffers((prev) => {
-      const next = { ...prev };
-
-      for (const file of files) {
-        const draft = drafts[file.name];
-        if (draft !== undefined) next[file.name] = draft;
-      }
-
-      return next;
-    });
-  }, [files]);
-
-  /**
-   * Saves the edited buffers as drafts.
-   *
-   * Only the files that actually differ from disk are stored, so the
-   * payload stays small and a file the learner did not touch is never
-   * shadowed by a stale draft.
-   */
-  useEffect(() => {
-    if (!draftsRestoredRef.current) return;
-
-    const drafts: Record<string, string> = {};
-
-    for (const file of files) {
-      const buffer = buffers[file.name];
-      if (buffer !== undefined && buffer !== file.source) {
-        drafts[file.name] = buffer;
-      }
-    }
-
-    writeDrafts(drafts);
-  }, [buffers, files]);
-
   const source = activeFile ? (buffers[activeFile.name] ?? "") : "";
   const target = activeFile ? playgroundTargets[activeFile.name] : undefined;
   const componentName = target?.component ?? "default";
   const registryProps = target?.props ?? {};
+
+  // The three extracted hooks: drafts, console, and compile-and-preview.
+  usePlaygroundDrafts({ files, buffers, setBuffers });
+
+  const {
+    consoleEntries,
+    handleSandboxLog,
+    clearConsole,
+  } = usePlaygroundConsole();
+
 
   /**
    * The props actually handed to the component.
@@ -178,142 +122,24 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
    */
   const hasNoComponent = componentName === "none";
 
-  const run = useCallback(
-    async (
-      fileName: string,
-      code: string,
-      requestId: number,
-      signal: AbortSignal,
-    ) => {
-      try {
-        const response = await fetch("/api/playground/compile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal,
-          body: JSON.stringify({
-            fileName,
-            source: code,
-            component: componentName,
-          }),
-        });
+  const {
+    status,
+    compileError,
+    runtimeError,
+    compiledCode,
+    compiledCss,
+    highlightedHtml,
+    typeDiagnostics,
+    handleSandboxError,
+    handleSandboxRendered,
+  } = usePlaygroundCompile({
+    activeFile,
+    source,
+    componentName,
+    hasNoComponent,
+  });
 
-        const result = (await response.json()) as {
-          ok: boolean;
-          code?: string;
-          css?: string;
-          html?: string;
-          diagnostics?: TypeDiagnostic[];
-          error?: string;
-        };
-
-        if (requestId !== requestIdRef.current) return;
-
-        if (!result.ok || !result.code || !result.css) {
-          setStatus("error");
-          setCompileError(result.error ?? "Compile မအောင်မြင်ပါ။");
-          setCompiledCode(null);
-          setCompiledCss(null);
-          setHighlightedHtml(null);
-          setTypeDiagnostics([]);
-          return;
-        }
-
-        setCompiledCode(result.code);
-        setCompiledCss(result.css);
-        setHighlightedHtml(result.html ?? null);
-        setTypeDiagnostics(result.diagnostics ?? []);
-        setStatus("ok");
-      } catch (error) {
-        if (signal.aborted || requestId !== requestIdRef.current) return;
-        setStatus("error");
-        setCompileError(
-          error instanceof Error
-            ? `Compile API ကို မေးနိုင်ခဲ့ပါ။ ${error.message}`
-            : "Compile API ကို မေးနိုင်ခဲ့ပါ။ Server ကို စစ်ပါ။",
-        );
-        setCompiledCode(null);
-        setCompiledCss(null);
-        setHighlightedHtml(null);
-        setTypeDiagnostics([]);
-      }
-    },
-    [componentName],
-  );
-
-  // Compile edits promptly and cancel any request for an older source.
-  useEffect(() => {
-    if (!activeFile || hasNoComponent) return;
-
-    const requestId = ++requestIdRef.current;
-    compileControllerRef.current?.abort();
-    setStatus("compiling");
-    setCompileError(null);
-    setRuntimeError(null);
-
-    const timer = setTimeout(() => {
-      const controller = new AbortController();
-      compileControllerRef.current = controller;
-      void run(activeFile.name, source, requestId, controller.signal);
-    }, 180);
-
-    return () => {
-      clearTimeout(timer);
-      compileControllerRef.current?.abort();
-    };
-  }, [activeFile, source, run, hasNoComponent]);
-
-  // Clear the preview when the active file has nothing to render.
-  useEffect(() => {
-    if (!hasNoComponent) return;
-    setCompiledCode(null);
-    setCompiledCss(null);
-    setStatus("idle");
-  }, [hasNoComponent]);
-
-  // Flush any buffered console entries when the playground unmounts.
-  useEffect(() => {
-    return () => {
-      if (flushTimerRef.current !== null) {
-        clearTimeout(flushTimerRef.current);
-      }
-    };
-  }, []);
-
-  /**
-   * A log line from inside the sandbox.
-   *
-   * The entry is buffered in a ref and flushed on a timer. Writing to
-   * React state directly would re-render the playground on every log
-   * call, and React's own development logging would loop.
-   */
-  const handleSandboxLog = useCallback((entry: SandboxLogEntry) => {
-    const next: ConsoleEntry = {
-      id: ++consoleIdRef.current,
-      level: entry.level,
-      text: entry.text,
-    };
-
-    pendingLogsRef.current.push(next);
-
-    if (flushTimerRef.current !== null) return;
-
-    flushTimerRef.current = setTimeout(() => {
-      flushTimerRef.current = null;
-      const pending = pendingLogsRef.current;
-      if (pending.length === 0) return;
-      pendingLogsRef.current = [];
-      setConsoleEntries((prev) => [...prev, ...pending].slice(-200));
-    }, 120);
-  }, []);
-
-  const handleSandboxError = useCallback((error: SandboxErrorReport) => {
-    setRuntimeError(error);
-    setStatus("error");
-  }, []);
-
-  const handleSandboxRendered = useCallback(() => {
-    setRuntimeError(null);
-  }, []);
+  // handleSandboxError, handleSandboxRendered, and clearConsole come from the extracted hooks.
 
   function handleChange(next: string) {
     if (!activeFile) return;
@@ -658,7 +484,7 @@ export function Playground({ files, initialFile }: PlaygroundProps) {
       <section className="flex h-28 min-w-0 shrink-0 flex-col sm:h-32">
         <PlaygroundConsole
           entries={consoleEntries}
-          onClear={() => setConsoleEntries([])}
+          onClear={clearConsole}
         />
       </section>
     </div>

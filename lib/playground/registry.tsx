@@ -52,22 +52,22 @@ export const playgroundTargets: Record<string, PlaygroundTarget> = {
     component: "UserProfile",
     props: {
       name: "Mingalarpar",
-      age: <p>28</p>,
-      isOnline: "Online",
+      age: 28,
+      isOnline: true,
     },
     label: "UserProfile",
   },
-  "p2l5.tsx": {
+  "P2L5.tsx": {
     component: "default",
     props: {},
     label: "ProfileEditor",
   },
-  "p2l6.tsx": {
+  "P2L6.tsx": {
     component: "default",
     props: {},
     label: "NameInput",
   },
-  "p2l7.tsx": {
+  "P2L7.tsx": {
     component: "default",
     props: {
       title: "Mingalarpar",

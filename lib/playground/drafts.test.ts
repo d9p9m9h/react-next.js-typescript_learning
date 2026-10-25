@@ -2,17 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readDrafts, writeDrafts, DRAFT_STORAGE_KEY, DRAFT_VERSION, getStorage } from "@/lib/playground/drafts";
 
 describe("drafts.ts", () => {
-  let mockStorage: Storage;
+  let mockStorage: any;
 
   beforeEach(() => {
     mockStorage = {
-      getItem: vi.fn(),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-      key: vi.fn(),
+      getItem: vi.fn() as any,
+      setItem: vi.fn() as any,
+      removeItem: vi.fn() as any,
+      clear: vi.fn() as any,
+      key: vi.fn() as any,
       length: 0,
-    };
+    } as any;
     vi.stubGlobal("window", { localStorage: mockStorage });
   });
 

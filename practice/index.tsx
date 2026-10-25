@@ -2,7 +2,7 @@ import React from 'react';
 
 interface setType {
   name: string
-  age: React.ReactElement
+  age: number
   isOnline: boolean
   children: React.ReactNode
 }
