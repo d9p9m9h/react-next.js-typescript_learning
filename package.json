@@ -2,7 +2,7 @@
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "typecheck": "tsc -b",
-    "test": "vitest run",
+    "test": "vitest run --converage",
     "test:watch": "vitest watch"
   },
   "dependencies": {
